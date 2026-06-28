@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hoshikyuu Player</string>
+    <string name="tab_home">探索</string>
+    <string name="tab_search">搜尋</string>
+    <string name="tab_library">我的</string>
+</resources>

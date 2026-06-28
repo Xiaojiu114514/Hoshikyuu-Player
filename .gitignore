@@ -1,0 +1,41 @@
+﻿# ── Android / Kotlin ──
+*.class
+*.dex
+*.apk
+*.aab
+*.ap_
+*.aar
+
+# ── Build outputs ──
+/build/
+/app/build/
+.gradle/
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# ── Kotlin ──
+*.kotlin_module
+
+# ── Android Studio ──
+*.hprof
+*.snap
+*.snap.*
+/build/
+/captures/
+.externalNativeBuild/
+
+# ── Gradle wrapper ──
+/gradle/wrapper/gradle-wrapper.jar
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Dev notes (not for public repo) ──
+開發方案.txt
+
+# ── Logs ──
+*.log

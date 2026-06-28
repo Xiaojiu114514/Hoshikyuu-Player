@@ -1,0 +1,188 @@
+package com.hoshikyuu.player.ui.screens.download
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import com.hoshikyuu.player.player.PlayerManager
+import com.hoshikyuu.player.ui.components.SongItem
+import com.hoshikyuu.player.ui.navigation.Screen
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DownloadManagementScreen(
+    navController: NavController,
+    playerManager: PlayerManager,
+    viewModel: DownloadManagementViewModel = hiltViewModel()
+) {
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val downloadedSongs by viewModel.downloadedSongs.collectAsState()
+    val favoriteIds by playerManager.favoriteIds.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("下载管理") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, null)
+                    }
+                },
+                actions = {
+                    if (downloadedSongs.isNotEmpty()) {
+                        IconButton(onClick = {
+                            viewModel.clearAllDownloads { success ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(if (success) "已清除所有下载" else "清除失败")
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Default.Delete, "全部删除")
+                        }
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        if (downloadedSongs.isEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Download, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    Text("暂无下载的歌曲", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
+            LazyColumn(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                items(downloadedSongs) { song ->
+                    var menuExpanded by remember { mutableStateOf(false) }
+
+                    SongItem(
+                        song = song,
+                        onClick = {
+                            // 直接播放本地文件（PlayerManager 已支持本地路径检测）
+                            playerManager.play(song)
+                            navController.navigate(Screen.FullPlayer.createRoute(song.id))
+                        },
+                        trailing = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // 添加到播放队列
+                                IconButton(
+                                    onClick = {
+                                        if (!playerManager.isSongInQueue(song.id)) {
+                                            playerManager.addToQueueAfterCurrent(song)
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("已加入播放列表：${song.name}")
+                                            }
+                                        } else {
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("歌曲已在播放列表中")
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PlaylistAdd,
+                                        contentDescription = "添加到队列",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                // 三点菜单（收藏 / 删除下载）
+                                Box {
+                                    IconButton(
+                                        onClick = { menuExpanded = !menuExpanded },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.MoreVert,
+                                            contentDescription = "更多",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = menuExpanded,
+                                        onDismissRequest = { menuExpanded = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        if (favoriteIds.contains(song.id)) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(18.dp),
+                                                        tint = if (favoriteIds.contains(song.id)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(if (favoriteIds.contains(song.id)) "取消收藏" else "收藏")
+                                                }
+                                            },
+                                            onClick = {
+                                                menuExpanded = false
+                                                playerManager.toggleFavorite(song)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        Icons.Default.Delete,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(18.dp),
+                                                        tint = MaterialTheme.colorScheme.error
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text("删除下载")
+                                                }
+                                            },
+                                            onClick = {
+                                                menuExpanded = false
+                                                viewModel.removeDownload(song.id)
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar("已删除：${song.name}")
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        isFavorite = favoriteIds.contains(song.id),
+                        onToggleFavorite = { /* 已在菜单中处理，此处留空 */ },
+                        showOverflowMenu = false,   // 不使用内置三点菜单
+                        onDownload = null,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
+                item { Spacer(Modifier.height(80.dp)) }
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
