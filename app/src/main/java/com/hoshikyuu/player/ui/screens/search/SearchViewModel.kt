@@ -1,5 +1,6 @@
 package com.hoshikyuu.player.ui.screens.search
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hoshikyuu.player.data.repository.MusicRepository
@@ -10,13 +11,12 @@ import com.hoshikyuu.player.player.PlayerManager
 import com.hoshikyuu.player.utils.NetworkPreferenceManager
 import com.hoshikyuu.player.utils.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
-import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -44,20 +44,18 @@ class SearchViewModel @Inject constructor(
 
     fun onSearch(query: String) {
         if (query.isBlank()) return
-        
-        // 检查网络是否被禁用
+
         if (!networkPreferenceManager.isMobileNetworkAllowed()) {
             _searchState.value = UiState.Error("网络已禁用，请连接WiFi后搜索")
             return
         }
-        
+
         addToHistory(query.trim())
         doSearch(query.trim())
     }
 
     fun onHistoryClick(query: String) {
         _searchQuery.value = query
-        // 检查网络是否被禁用
         if (!networkPreferenceManager.isMobileNetworkAllowed()) {
             _searchState.value = UiState.Error("网络已禁用，请连接WiFi后搜索")
             return
@@ -102,7 +100,8 @@ class SearchViewModel @Inject constructor(
         playerManager.play(song)
     }
 
-    fun downloadSong(song: Song, onResult: (Result<File>) -> Unit = {}) {
+    // 下载歌曲 - 返回 Uri
+    fun downloadSong(song: Song, onResult: (Result<Uri>) -> Unit = {}) {
         if (!networkPreferenceManager.isMobileNetworkAllowed()) {
             onResult(Result.failure(Exception("网络已禁用，请连接WiFi后下载")))
             return

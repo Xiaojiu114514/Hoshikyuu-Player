@@ -53,7 +53,7 @@ fun SearchScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            placeholder = { Text("搜寻歌曲、歌手、专辑...") },
+            placeholder = { Text("搜尋歌曲、歌手、專輯...") },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = null)
             },
@@ -114,7 +114,7 @@ fun SearchScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        "搜索历史",
+                                        "搜索歷史",
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -142,7 +142,7 @@ fun SearchScreen(
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                "热门搜索",
+                                "熱門搜索",
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
                             )
@@ -174,7 +174,7 @@ fun SearchScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        "没有找到相关结果",
+                                        "沒有找到相關結果",
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -189,7 +189,7 @@ fun SearchScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                "搜索结果 (${state.data.size})",
+                                                "搜索結果 (${state.data.size})",
                                                 style = MaterialTheme.typography.titleMedium
                                             )
                                             Spacer(modifier = Modifier.weight(1f))

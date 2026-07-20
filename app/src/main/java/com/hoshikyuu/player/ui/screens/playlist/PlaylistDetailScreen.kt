@@ -45,7 +45,7 @@ fun PlaylistDetailScreen(
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (playlistName.isNotBlank()) playlistName else "歌单详情",
+                    if (playlistName.isNotBlank()) playlistName else "歌單詳情",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -57,7 +57,7 @@ fun PlaylistDetailScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.MusicNote, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
-                    Text("歌单为空", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("歌單為空", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
@@ -131,7 +131,7 @@ fun PlaylistDetailScreen(
                                 }
                             }
                         },
-                        showOverflowMenu = true,   // 显示三点更多
+                        showOverflowMenu = true,
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                 }

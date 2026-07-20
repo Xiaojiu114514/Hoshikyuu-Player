@@ -1,5 +1,6 @@
 package com.hoshikyuu.player.ui.screens.home
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hoshikyuu.player.data.repository.MusicRepository
@@ -11,12 +12,12 @@ import com.hoshikyuu.player.player.PlayerManager
 import com.hoshikyuu.player.utils.NetworkPreferenceManager
 import com.hoshikyuu.player.utils.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import java.io.File
 import javax.inject.Inject
 
@@ -52,9 +53,7 @@ class HomeViewModel @Inject constructor(
 
     private fun checkNetworkAndLoad() {
         viewModelScope.launch {
-            // 检查是否应该显示警告
             if (!networkPreferenceManager.shouldShowMobileWarning()) {
-                // 用户已做出选择
                 if (networkPreferenceManager.isMobileNetworkAllowed()) {
                     loadHomeData()
                 } else {
@@ -63,16 +62,13 @@ class HomeViewModel @Inject constructor(
                 return@launch
             }
 
-            // 首次启动，检查网络类型
             val isMobileData = withContext(Dispatchers.IO) {
                 networkUtils.isMobileData()
             }
 
             if (isMobileData) {
-                // 移动网络，显示警告
                 _showMobileDataWarning.value = true
             } else {
-                // WiFi，直接加载
                 networkPreferenceManager.setShowMobileWarning(false)
                 networkPreferenceManager.setMobileNetworkAllowed(true)
                 loadHomeData()
@@ -87,7 +83,6 @@ class HomeViewModel @Inject constructor(
                 setMobileNetworkAllowed(true)
                 setShowMobileWarning(false)
             }
-            // 重新加载数据
             loadHomeData()
         }
     }
@@ -99,14 +94,12 @@ class HomeViewModel @Inject constructor(
                 setMobileNetworkAllowed(false)
                 setShowMobileWarning(false)
             }
-            // 只加载缓存数据
             loadCachedDataOnly()
         }
     }
 
     private fun loadCachedDataOnly() {
         viewModelScope.launch {
-            // 热歌榜缓存
             val trendingCached = withContext(Dispatchers.IO) {
                 cacheRepository.getCachedRanking("3778678")
             }
@@ -116,7 +109,6 @@ class HomeViewModel @Inject constructor(
                 _trendingSongs.value = UiState.Error("网络已禁用，且无本地缓存")
             }
 
-            // 新歌榜缓存
             val recommendedCached = withContext(Dispatchers.IO) {
                 cacheRepository.getCachedRanking("3779629")
             }
@@ -129,9 +121,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun loadHomeData() {
-        // 热歌榜
         loadRanking("3778678", "热歌榜", _trendingSongs)
-        // 新歌榜
         loadRanking("3779629", "新歌榜", _recommendedSongs)
     }
 
@@ -141,7 +131,6 @@ class HomeViewModel @Inject constructor(
         stateFlow: MutableStateFlow<UiState<List<Song>>>
     ) {
         viewModelScope.launch {
-            // 1. 先检查本地缓存是否有效（今日缓存）
             val isValid = withContext(Dispatchers.IO) {
                 cacheRepository.isValidCache(rankingId)
             }
@@ -156,9 +145,7 @@ class HomeViewModel @Inject constructor(
                 }
             }
 
-            // 2. 检查是否允许网络请求
             if (!networkPreferenceManager.isMobileNetworkAllowed()) {
-                // 网络被禁用，尝试加载旧缓存
                 val cachedSongs = withContext(Dispatchers.IO) {
                     cacheRepository.getCachedRanking(rankingId)
                 }
@@ -170,7 +157,6 @@ class HomeViewModel @Inject constructor(
                 return@launch
             }
 
-            // 3. 从 API 获取
             fetchRankingFromApi(rankingId, rankingName, stateFlow)
         }
     }
@@ -224,7 +210,8 @@ class HomeViewModel @Inject constructor(
         return true
     }
 
-    fun downloadSong(song: Song, onResult: (Result<File>) -> Unit = {}) {
+    // 下载歌曲 - 返回 Uri
+    fun downloadSong(song: Song, onResult: (Result<Uri>) -> Unit = {}) {
         if (!networkPreferenceManager.isMobileNetworkAllowed()) {
             onResult(Result.failure(Exception("网络已禁用，请连接WiFi后下载")))
             return

@@ -1,5 +1,6 @@
 package com.hoshikyuu.player.ui.screens.player
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hoshikyuu.player.domain.Song
@@ -14,7 +15,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -73,7 +73,8 @@ class PlayerViewModel @Inject constructor(
         return if (idx < 0) 0 else idx
     }
 
-    fun downloadCurrentSong(onResult: (Result<File>) -> Unit = {}) {
+    // 下载当前歌曲 - 返回 Uri
+    fun downloadCurrentSong(onResult: (Result<Uri>) -> Unit = {}) {
         val song = playerManager.currentSong.value
         if (song == null) {
             onResult(Result.failure(Exception("当前没有播放歌曲")))

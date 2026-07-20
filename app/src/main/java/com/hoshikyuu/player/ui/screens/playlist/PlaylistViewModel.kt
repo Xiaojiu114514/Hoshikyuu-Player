@@ -1,5 +1,6 @@
 package com.hoshikyuu.player.ui.screens.playlist
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hoshikyuu.player.data.local.entity.PlaylistEntity
@@ -10,11 +11,12 @@ import com.hoshikyuu.player.domain.Song
 import com.hoshikyuu.player.player.DownloadManager
 import com.hoshikyuu.player.player.PlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.File
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -70,10 +72,12 @@ class PlaylistViewModel @Inject constructor(
         return true
     }
 
-    // 下载歌曲
-    fun downloadSong(song: Song, onResult: (Result<File>) -> Unit = {}) {
+    // 下载歌曲 - 返回 Uri
+    fun downloadSong(song: Song, onResult: (Result<Uri>) -> Unit = {}) {
         viewModelScope.launch {
-            val detailResult = musicRepository.fetchSongDetailForce(song.id, song.source)
+            val detailResult = withContext(Dispatchers.IO) {
+                musicRepository.fetchSongDetailForce(song.id, song.source)
+            }
             if (detailResult.isSuccess) {
                 val fullSong = detailResult.getOrNull()!!
                 downloadManager.downloadSong(fullSong, onResult)

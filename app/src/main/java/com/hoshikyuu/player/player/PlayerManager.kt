@@ -154,13 +154,7 @@ class PlayerManager @Inject constructor(
 
     fun play(song: Song) {
         scope.launch {
-            // 检查是否为本地文件
-            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://")
-            if (!isLocal && networkPreferenceManager.isNetworkBlocked()) {
-                _errorMessage.value = "网络已禁用，无法播放在线歌曲"
-                return@launch
-            }
-
+            // 1. 优先检查本地缓存/下载
             val local = withContext(Dispatchers.IO) { getLocalSong(song.id) }
             if (local != null) {
                 _queue.value = listOf(local)
@@ -169,13 +163,28 @@ class PlayerManager @Inject constructor(
                 return@launch
             }
 
+            // 2. 检查是否为本地文件路径（包括 content://）
+            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://") || song.mp3Url.startsWith("content://")
+            if (isLocal) {
+                _queue.value = listOf(song)
+                _currentIndex.value = 0
+                playInternalDirect(song)
+                return@launch
+            }
+
+            // 3. 检查网络是否被禁用
+            if (networkPreferenceManager.isNetworkBlocked()) {
+                _errorMessage.value = "网络已禁用，无法播放在线歌曲"
+                return@launch
+            }
+
+            // 4. 请求网络获取完整信息
             val fullSong = withContext(Dispatchers.IO) { fetchSongDetailForce(song) }
             if (fullSong == null) {
                 _errorMessage.value = "获取歌曲信息失败"
                 return@launch
             }
 
-            // 异步缓存（使用已有 fullSong，不再调用 API）
             withContext(Dispatchers.IO) {
                 cacheSongForOffline(fullSong)
             }
@@ -192,12 +201,6 @@ class PlayerManager @Inject constructor(
             _queue.value = songs
             val target = songs.getOrNull(startIndex) ?: return@launch
 
-            val isLocal = target.mp3Url.startsWith("/") || target.mp3Url.startsWith("file://")
-            if (!isLocal && networkPreferenceManager.isNetworkBlocked()) {
-                _errorMessage.value = "网络已禁用，无法播放在线歌曲"
-                return@launch
-            }
-
             val local = withContext(Dispatchers.IO) { getLocalSong(target.id) }
             if (local != null) {
                 val newQueue = _queue.value.toMutableList()
@@ -205,6 +208,18 @@ class PlayerManager @Inject constructor(
                 _queue.value = newQueue
                 _currentIndex.value = startIndex
                 playInternalDirect(local)
+                return@launch
+            }
+
+            val isLocal = target.mp3Url.startsWith("/") || target.mp3Url.startsWith("file://") || target.mp3Url.startsWith("content://")
+            if (isLocal) {
+                _currentIndex.value = startIndex
+                playInternalDirect(target)
+                return@launch
+            }
+
+            if (networkPreferenceManager.isNetworkBlocked()) {
+                _errorMessage.value = "网络已禁用，无法播放在线歌曲"
                 return@launch
             }
 
@@ -228,15 +243,20 @@ class PlayerManager @Inject constructor(
 
     fun addToQueueAfterCurrent(song: Song) {
         scope.launch {
-            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://")
-            if (!isLocal && networkPreferenceManager.isNetworkBlocked()) {
-                _errorMessage.value = "网络已禁用，无法添加在线歌曲"
-                return@launch
-            }
-
             val local = withContext(Dispatchers.IO) { getLocalSong(song.id) }
             if (local != null) {
                 addToQueueInternal(local, afterCurrent = true)
+                return@launch
+            }
+
+            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://") || song.mp3Url.startsWith("content://")
+            if (isLocal) {
+                addToQueueInternal(song, afterCurrent = true)
+                return@launch
+            }
+
+            if (networkPreferenceManager.isNetworkBlocked()) {
+                _errorMessage.value = "网络已禁用，无法添加在线歌曲"
                 return@launch
             }
 
@@ -255,15 +275,20 @@ class PlayerManager @Inject constructor(
 
     fun addToQueue(song: Song) {
         scope.launch {
-            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://")
-            if (!isLocal && networkPreferenceManager.isNetworkBlocked()) {
-                _errorMessage.value = "网络已禁用，无法添加在线歌曲"
-                return@launch
-            }
-
             val local = withContext(Dispatchers.IO) { getLocalSong(song.id) }
             if (local != null) {
                 addToQueueInternal(local, afterCurrent = false)
+                return@launch
+            }
+
+            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://") || song.mp3Url.startsWith("content://")
+            if (isLocal) {
+                addToQueueInternal(song, afterCurrent = false)
+                return@launch
+            }
+
+            if (networkPreferenceManager.isNetworkBlocked()) {
+                _errorMessage.value = "网络已禁用，无法添加在线歌曲"
                 return@launch
             }
 
@@ -438,12 +463,6 @@ class PlayerManager @Inject constructor(
         if (index < 0 || index >= _queue.value.size) return
         val song = _queue.value[index]
         scope.launch {
-            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://")
-            if (!isLocal && networkPreferenceManager.isNetworkBlocked()) {
-                _errorMessage.value = "网络已禁用，无法播放在线歌曲"
-                return@launch
-            }
-
             val local = withContext(Dispatchers.IO) { getLocalSong(song.id) }
             if (local != null) {
                 val newQueue = _queue.value.toMutableList()
@@ -451,6 +470,18 @@ class PlayerManager @Inject constructor(
                 _queue.value = newQueue
                 _currentIndex.value = index
                 playInternalDirect(local)
+                return@launch
+            }
+
+            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://") || song.mp3Url.startsWith("content://")
+            if (isLocal) {
+                _currentIndex.value = index
+                playInternalDirect(song)
+                return@launch
+            }
+
+            if (networkPreferenceManager.isNetworkBlocked()) {
+                _errorMessage.value = "网络已禁用，无法播放在线歌曲"
                 return@launch
             }
 
@@ -513,25 +544,41 @@ class PlayerManager @Inject constructor(
     }
 
     private suspend fun getLocalSong(songId: String): Song? {
+        // 1. 检查下载管理（存储的是 Uri 字符串）
         val download = downloadRepository.getDownload(songId)
         if (download != null) {
-            val file = File(download.localFilePath)
-            if (file.exists()) {
+            val uriString = download.localFilePath
+            if (uriString.startsWith("content://")) {
                 return Song(
                     id = download.songId,
                     name = download.songName,
                     album = download.album,
                     artist = download.artist,
                     coverUrl = download.coverUrl,
-                    mp3Url = download.localFilePath,
+                    mp3Url = uriString,
                     lrc = download.lrc,
                     source = download.source
                 )
             } else {
-                downloadRepository.removeDownload(songId)
+                val file = File(uriString)
+                if (file.exists()) {
+                    return Song(
+                        id = download.songId,
+                        name = download.songName,
+                        album = download.album,
+                        artist = download.artist,
+                        coverUrl = download.coverUrl,
+                        mp3Url = uriString,
+                        lrc = download.lrc,
+                        source = download.source
+                    )
+                } else {
+                    downloadRepository.removeDownload(songId)
+                }
             }
         }
 
+        // 2. 检查缓存（内部私有目录）
         val cachedFile = downloadManager.getCachedFile(songId)
         if (cachedFile != null && cachedFile.exists()) {
             val cached = cacheRepository.getCachedSong(songId)
@@ -575,20 +622,23 @@ class PlayerManager @Inject constructor(
                 }
             }
 
-            // 检查是否已下载
+            // 检查是否已下载（用户下载管理）
             val download = downloadRepository.getDownload(fullSong.id)
-            if (download != null && File(download.localFilePath).exists()) {
+            if (download != null) {
+                // 如果有记录，可能是 Uri 或路径，我们信任它存在
                 return
             }
 
             // 使用已有完整信息缓存（不再调用 API）
             downloadManager.cacheSongWithFullInfo(fullSong) { result ->
                 if (result.isSuccess) {
-                    val file = result.getOrNull()!!
-                    scope.launch(Dispatchers.IO) {
-                        cacheRepository.saveSong(
-                            fullSong.copy(mp3Url = file.absolutePath)
-                        )
+                    val file = result.getOrNull()
+                    file?.let {
+                        scope.launch(Dispatchers.IO) {
+                            cacheRepository.saveSong(
+                                fullSong.copy(mp3Url = it.absolutePath)
+                            )
+                        }
                     }
                 }
                 // 缓存失败静默处理

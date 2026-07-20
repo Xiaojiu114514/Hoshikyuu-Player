@@ -1,6 +1,7 @@
 package com.hoshikyuu.player.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.hoshikyuu.player.data.local.dao.DownloadDao
 import com.hoshikyuu.player.data.local.entity.DownloadEntity
 import com.hoshikyuu.player.domain.Song
@@ -16,27 +17,43 @@ class DownloadRepository @Inject constructor(
     private val downloadDao: DownloadDao,
     private val context: Context
 ) {
+    companion object {
+        private const val TAG = "DownloadRepository"
+    }
 
     fun getAllDownloads(): Flow<List<DownloadEntity>> = downloadDao.getAllDownloads()
 
     suspend fun addDownload(song: Song, localFilePath: String) {
-        downloadDao.addDownload(
-            DownloadEntity(
-                songId = song.id,
-                songName = song.name,
-                artist = song.artist,
-                album = song.album,
-                coverUrl = song.coverUrl,
-                localFilePath = localFilePath,
-                lrc = song.lrc,   // 保存歌词
-                source = song.source
+        try {
+            Log.d(TAG, "addDownload: ${song.id} -> $localFilePath")
+            downloadDao.addDownload(
+                DownloadEntity(
+                    songId = song.id,
+                    songName = song.name,
+                    artist = song.artist,
+                    album = song.album,
+                    coverUrl = song.coverUrl,
+                    localFilePath = localFilePath,
+                    lrc = song.lrc,
+                    source = song.source
+                )
             )
-        )
+        } catch (e: Exception) {
+            Log.e(TAG, "addDownload异常", e)
+            throw e
+        }
     }
 
     suspend fun removeDownload(songId: String) {
         val entity = downloadDao.getDownload(songId)
-        entity?.localFilePath?.let { File(it).delete() }
+        entity?.localFilePath?.let {
+            try {
+                File(it).delete()
+                Log.d(TAG, "删除文件: $it")
+            } catch (e: Exception) {
+                Log.e(TAG, "删除文件失败", e)
+            }
+        }
         downloadDao.removeDownload(songId)
     }
 
@@ -52,7 +69,7 @@ class DownloadRepository @Inject constructor(
                     artist = it.artist,
                     coverUrl = it.coverUrl,
                     mp3Url = it.localFilePath,
-                    lrc = it.lrc,        // 加载歌词
+                    lrc = it.lrc,
                     source = it.source
                 )
             }
@@ -67,7 +84,11 @@ class DownloadRepository @Inject constructor(
 
     suspend fun clearAllDownloads() {
         val entities = downloadDao.getAllDownloads().first()
-        entities.forEach { File(it.localFilePath).delete() }
+        entities.forEach {
+            try {
+                File(it.localFilePath).delete()
+            } catch (_: Exception) { }
+        }
         entities.forEach { downloadDao.removeDownload(it.songId) }
     }
 }

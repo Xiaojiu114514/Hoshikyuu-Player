@@ -53,7 +53,6 @@ fun FullPlayerScreen(
     val lyricLines by viewModel.lyricLines.collectAsState()
     val errorMessage by viewModel.playerManager.errorMessage.collectAsState()
 
-    // 全屏歌词状态
     var isLyricsFullscreen by remember { mutableStateOf(false) }
 
     LaunchedEffect(errorMessage) {
@@ -82,7 +81,6 @@ fun FullPlayerScreen(
             .fillMaxSize()
             .background(bgGradient)
     ) {
-        // 模糊背景
         if (song?.coverUrl != null) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
@@ -102,7 +100,6 @@ fun FullPlayerScreen(
             )
         }
 
-        // 主内容（非全屏模式）
         if (!isLyricsFullscreen) {
             Column(
                 modifier = Modifier
@@ -110,7 +107,6 @@ fun FullPlayerScreen(
                     .statusBarsPadding()
                     .padding(top = 8.dp)
             ) {
-                // 顶部导航栏
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -181,13 +177,12 @@ fun FullPlayerScreen(
                     is UiState.Success -> {
                         val currentSong = (songState as UiState.Success).data
 
-                        // 封面
                         AsyncImage(
                             model = ImageRequest.Builder(context)
                                 .data(currentSong.coverUrl)
                                 .crossfade(true)
                                 .build(),
-                            contentDescription = "专辑封面",
+                            contentDescription = "專輯封面",
                             modifier = Modifier
                                 .align(Alignment.CenterHorizontally)
                                 .size(280.dp)
@@ -197,7 +192,6 @@ fun FullPlayerScreen(
 
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        // 歌曲信息
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -221,7 +215,6 @@ fun FullPlayerScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // 进度条
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -256,7 +249,6 @@ fun FullPlayerScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // 歌词区域（点击进入全屏）
                         val currentPosMs = (progress * durationMillis).toLong()
                         val currentLyricIdx = viewModel.getLyricIndex(currentPosMs)
                         val lyricsListState = rememberLazyListState()
@@ -298,7 +290,7 @@ fun FullPlayerScreen(
                                 }
                             } else {
                                 Text(
-                                    text = "暂无歌词\n点击此处展开",
+                                    text = "暫無歌詞\n點擊此處展開",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = Color.White.copy(alpha = 0.3f),
                                     textAlign = TextAlign.Center,
@@ -311,7 +303,6 @@ fun FullPlayerScreen(
 
                         Spacer(modifier = Modifier.weight(0.5f))
 
-                        // 播放控制
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -344,7 +335,7 @@ fun FullPlayerScreen(
                                 IconButton(onClick = { viewModel.togglePlay() }) {
                                     Icon(
                                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        contentDescription = if (isPlaying) "暂停" else "播放",
+                                        contentDescription = if (isPlaying) "暫停" else "播放",
                                         tint = Color.White,
                                         modifier = Modifier.size(36.dp)
                                     )
@@ -376,9 +367,9 @@ fun FullPlayerScreen(
                                     Icon(
                                         Icons.Default.Repeat,
                                         contentDescription = when (repeatMode) {
-                                            RepeatMode.ONE -> "单曲循环"
-                                            RepeatMode.ALL -> "列表循环"
-                                            RepeatMode.NONE -> "顺序播放"
+                                            RepeatMode.ONE -> "單曲循環"
+                                            RepeatMode.ALL -> "列表循環"
+                                            RepeatMode.NONE -> "順序播放"
                                         },
                                         tint = if (repeatMode != RepeatMode.NONE) BrandMint else Color.Gray,
                                         modifier = Modifier.size(28.dp)
@@ -403,9 +394,9 @@ fun FullPlayerScreen(
                         ) {
                             Text(
                                 text = when (repeatMode) {
-                                    RepeatMode.NONE -> "顺序播放"
-                                    RepeatMode.ALL -> "列表循环"
-                                    RepeatMode.ONE -> "单曲循环"
+                                    RepeatMode.NONE -> "順序播放"
+                                    RepeatMode.ALL -> "列表循環"
+                                    RepeatMode.ONE -> "單曲循環"
                                 },
                                 color = Color.White.copy(alpha = 0.5f),
                                 style = MaterialTheme.typography.bodySmall
@@ -418,9 +409,8 @@ fun FullPlayerScreen(
             }
         }
 
-        // ============ 全屏歌词覆盖层 ============
+        // 全屏歌词
         if (isLyricsFullscreen) {
-            // 全屏背景（与播放器背景一致）
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -434,7 +424,6 @@ fun FullPlayerScreen(
                         )
                     )
             ) {
-                // 模糊背景（可选）
                 if (song?.coverUrl != null) {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
@@ -454,7 +443,6 @@ fun FullPlayerScreen(
                     )
                 }
 
-                // 返回按钮（左上角）
                 IconButton(
                     onClick = { isLyricsFullscreen = false },
                     modifier = Modifier
@@ -469,7 +457,6 @@ fun FullPlayerScreen(
                     )
                 }
 
-                // 全屏歌词 LazyColumn
                 val currentPosMs = (progress * durationMillis).toLong()
                 val currentLyricIdx = viewModel.getLyricIndex(currentPosMs)
                 val fullscreenLyricsState = rememberLazyListState()
@@ -510,7 +497,7 @@ fun FullPlayerScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "暂无歌词",
+                            text = "暫無歌詞",
                             style = MaterialTheme.typography.headlineMedium,
                             color = Color.White.copy(alpha = 0.4f)
                         )
@@ -519,16 +506,16 @@ fun FullPlayerScreen(
             }
         }
 
-        // ============ 对话框 ============
+        // 加入歌单对话框
         if (showPlaylistDialog) {
             val plVm: PlaylistViewModel = hiltViewModel()
             val playlistList by plVm.playlists.collectAsState()
             AlertDialog(
                 onDismissRequest = { showPlaylistDialog = false },
-                title = { Text("选择歌单") },
+                title = { Text("選擇歌單") },
                 text = {
                     if (playlistList.isEmpty()) {
-                        Text("暂无歌单，请先在「我的」页面建立")
+                        Text("暫無歌單，請先在「我的」頁面建立")
                     } else {
                         LazyColumn(
                             modifier = Modifier.heightIn(max = 300.dp)
@@ -541,12 +528,12 @@ fun FullPlayerScreen(
                                             try {
                                                 val success = plVm.addCurrentSongToPlaylist(playlist.id)
                                                 if (success) {
-                                                    snackbarHostState.showSnackbar("已加入歌单「${playlist.name}」")
+                                                    snackbarHostState.showSnackbar("已加入歌單「${playlist.name}」")
                                                 } else {
-                                                    snackbarHostState.showSnackbar("歌曲已在歌单中")
+                                                    snackbarHostState.showSnackbar("歌曲已在歌單中")
                                                 }
                                             } catch (e: Exception) {
-                                                snackbarHostState.showSnackbar("加入失败：${e.message}")
+                                                snackbarHostState.showSnackbar("加入失敗：${e.message}")
                                             }
                                         }
                                     },
@@ -566,7 +553,6 @@ fun FullPlayerScreen(
             )
         }
 
-        // ============ Snackbar ============
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)

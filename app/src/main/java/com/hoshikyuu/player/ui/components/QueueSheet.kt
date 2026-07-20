@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun QueueSheet(
     playerManager: PlayerManager,
-    onSongClick: (Int) -> Unit,   // 点击歌曲跳转播放
+    onSongClick: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -29,7 +29,7 @@ fun QueueSheet(
     val queue by playerManager.queue.collectAsState()
     val currentIdx by playerManager.currentIndex.collectAsState()
     val favoriteIds by playerManager.favoriteIds.collectAsState()
-    val playlistViewModel: PlaylistViewModel = hiltViewModel()   // 用于下载
+    val playlistViewModel: PlaylistViewModel = hiltViewModel()
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -50,7 +50,7 @@ fun QueueSheet(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "关闭")
+                    Icon(Icons.Default.Close, contentDescription = "關閉")
                 }
             }
 
@@ -62,7 +62,7 @@ fun QueueSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "播放列表为空",
+                        text = "播放列表為空",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -77,7 +77,7 @@ fun QueueSheet(
                     itemsIndexed(queue) { idx, song ->
                         SongItem(
                             song = song,
-                            onClick = { onSongClick(idx) },   // 外部处理跳转
+                            onClick = { onSongClick(idx) },
                             trailing = {
                                 IconButton(
                                     onClick = { playerManager.removeFromQueue(idx) },

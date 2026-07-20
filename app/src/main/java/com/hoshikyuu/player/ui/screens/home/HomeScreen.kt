@@ -46,16 +46,13 @@ fun HomeScreen(
     val recommendedState by viewModel.recommendedSongs.collectAsState()
     val favoriteIds by playerManager.favoriteIds.collectAsState()
 
-    // 移动网络警告弹窗
     val showMobileWarning by viewModel.showMobileDataWarning.collectAsState()
 
-    // 头像
     val avatarRepo = remember {
         EntryPointAccessors.fromApplication(context, AvatarRepositoryEntryPoint::class.java).avatarRepository()
     }
     val avatarUri by avatarRepo.avatarState.collectAsState()
 
-    // 移动网络警告弹窗
     if (showMobileWarning) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelMobileDataLoad() },

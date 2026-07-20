@@ -48,7 +48,7 @@ fun LibraryScreen(
     navController: NavController,
     playerManager: PlayerManager,
     viewModel: LibraryViewModel = hiltViewModel(),
-    playlistViewModel: PlaylistViewModel = hiltViewModel()   // 用于下载
+    playlistViewModel: PlaylistViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -82,7 +82,6 @@ fun LibraryScreen(
         }
     }
 
-    // 底部弹窗（收藏/历史）
     var showSheet by remember { mutableStateOf("") }
     val sheetSongs = when (showSheet) {
         "favorites" -> favoriteSongs
@@ -147,7 +146,6 @@ fun LibraryScreen(
                                     isFavorite = favoriteIds.contains(song.id),
                                     onToggleFavorite = { playerManager.toggleFavorite(song) },
                                     onDownload = {
-                                        // 使用 PlaylistViewModel 的下载方法
                                         playlistViewModel.downloadSong(song) { result ->
                                             scope.launch {
                                                 if (result.isSuccess) {
@@ -158,7 +156,7 @@ fun LibraryScreen(
                                             }
                                         }
                                     },
-                                    showOverflowMenu = true,   // 显示三点更多
+                                    showOverflowMenu = true,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
                                 )
                             }
