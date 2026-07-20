@@ -27,6 +27,7 @@ fun SettingScreen(
     val context = LocalContext.current
     val darkMode by viewModel.darkMode.collectAsState()
     val fileNameFormat by viewModel.fileNameFormat.collectAsState()
+    val saveLyrics by viewModel.saveLyrics.collectAsState()
     val cacheSize by viewModel.cacheSize.collectAsState()
     val dataSize by viewModel.dataSize.collectAsState()
 
@@ -46,9 +47,7 @@ fun SettingScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier = Modifier.fillMaxSize().padding(padding)
         ) {
             item {
                 SettingItem(
@@ -57,7 +56,6 @@ fun SettingScreen(
                     onClick = { showClearCacheDialog = true }
                 )
             }
-
             item {
                 SettingItem(
                     title = "清除数据",
@@ -65,7 +63,6 @@ fun SettingScreen(
                     onClick = { showClearDataDialog = true }
                 )
             }
-
             item {
                 ExpandableSettingGroup(
                     title = "深色模式",
@@ -86,7 +83,6 @@ fun SettingScreen(
                     }
                 )
             }
-
             item {
                 ExpandableSettingGroup(
                     title = "下载文件名格式",
@@ -100,46 +96,41 @@ fun SettingScreen(
                     }
                 )
             }
-
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("下载时保存歌词", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = saveLyrics,
+                        onCheckedChange = { viewModel.setSaveLyrics(it) }
+                    )
+                }
+            }
             item { Spacer(Modifier.height(32.dp)) }
         }
     }
 
-    // 清除缓存确认对话框
     if (showClearCacheDialog) {
         AlertDialog(
             onDismissRequest = { showClearCacheDialog = false },
             title = { Text("确认清除缓存") },
-            text = {
-                Text(
-                    "此操作将删除所有已缓存的歌曲文件（约 ${formatSize(cacheSize)}），\n" +
-                            "但不会删除您下载的歌曲。\n\n" +
-                            "确定继续吗？"
-                )
-            },
+            text = { Text("此操作将删除所有缓存的歌曲文件（约 ${formatSize(cacheSize)}），但不会删除下载的歌曲。\n\n确定继续吗？") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showClearCacheDialog = false
-                        viewModel.clearCache { success ->
-                            if (success) {
-                                // 提示成功
-                            }
-                        }
-                    }
-                ) {
-                    Text("确定", color = MaterialTheme.colorScheme.error)
-                }
+                TextButton(onClick = {
+                    showClearCacheDialog = false
+                    viewModel.clearCache { /* 可选提示 */ }
+                }) { Text("确定", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearCacheDialog = false }) {
-                    Text("取消")
-                }
+                TextButton(onClick = { showClearCacheDialog = false }) { Text("取消") }
             }
         )
     }
 
-    // 清除数据确认对话框
     if (showClearDataDialog) {
         AlertDialog(
             onDismissRequest = { showClearDataDialog = false },
@@ -147,43 +138,25 @@ fun SettingScreen(
             text = {
                 Text(
                     "此操作将删除所有本地数据，包括：\n" +
-                            "• 收藏列表\n" +
-                            "• 播放历史\n" +
-                            "• 下载的歌曲\n" +
-                            "• 应用设置\n" +
-                            "• 歌曲缓存\n\n" +
+                            "• 收藏列表\n• 播放历史\n• 下载的歌曲\n• 应用设置\n• 歌曲缓存\n\n" +
                             "此操作不可恢复，确定继续吗？"
                 )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showClearDataDialog = false
-                        viewModel.clearData { success ->
-                            if (success) {
-                                // 提示重启
-                            }
-                        }
-                    }
-                ) {
-                    Text("确定", color = MaterialTheme.colorScheme.error)
-                }
+                TextButton(onClick = {
+                    showClearDataDialog = false
+                    viewModel.clearData { /* 可选提示 */ }
+                }) { Text("确定", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDataDialog = false }) {
-                    Text("取消")
-                }
+                TextButton(onClick = { showClearDataDialog = false }) { Text("取消") }
             }
         )
     }
 }
 
 @Composable
-private fun SettingItem(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
+private fun SettingItem(title: String, subtitle: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -192,9 +165,7 @@ private fun SettingItem(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -220,9 +191,7 @@ private fun ExpandableSettingGroup(
     ) {
         Column(Modifier.fillMaxWidth()) {
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -253,11 +222,9 @@ private fun ExpandableSettingGroup(
     }
 }
 
-private fun formatSize(size: Long): String {
-    return when {
-        size < 1024 -> "$size B"
-        size < 1024 * 1024 -> "${size / 1024} KB"
-        size < 1024 * 1024 * 1024 -> "${size / (1024 * 1024)} MB"
-        else -> "${size / (1024 * 1024 * 1024)} GB"
-    }
+private fun formatSize(size: Long): String = when {
+    size < 1024 -> "$size B"
+    size < 1024 * 1024 -> "${size / 1024} KB"
+    size < 1024 * 1024 * 1024 -> "${size / (1024 * 1024)} MB"
+    else -> "${size / (1024 * 1024 * 1024)} GB"
 }

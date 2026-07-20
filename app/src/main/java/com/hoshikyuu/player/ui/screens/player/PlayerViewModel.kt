@@ -47,11 +47,8 @@ class PlayerViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            playerManager.repeatMode.collect { mode ->
-                _repeatMode.value = mode
-            }
+            playerManager.repeatMode.collect { mode -> _repeatMode.value = mode }
         }
-
         viewModelScope.launch {
             playerManager.isPlaying.collect { playing ->
                 if (playing) startProgressTracker() else stopProgressTracker()
@@ -63,8 +60,10 @@ class PlayerViewModel @Inject constructor(
     fun toggleFavorite(song: Song) = playerManager.toggleFavorite(song)
     fun seekTo(fraction: Float) = playerManager.seekTo(fraction)
     fun skipNext() = playerManager.skipNext()
-    fun addCurrentToQueue() { playerManager.currentSong.value?.let { playerManager.addToQueueAfterCurrent(it) } }
     fun skipPrevious() = playerManager.skipPrevious()
+    fun addCurrentToQueue() {
+        playerManager.currentSong.value?.let { playerManager.addToQueueAfterCurrent(it) }
+    }
 
     fun getLyricIndex(positionMs: Long): Int {
         val lines = lyricLines.value
@@ -73,7 +72,6 @@ class PlayerViewModel @Inject constructor(
         return if (idx < 0) 0 else idx
     }
 
-    // 下载当前歌曲 - 返回 Uri
     fun downloadCurrentSong(onResult: (Result<Uri>) -> Unit = {}) {
         val song = playerManager.currentSong.value
         if (song == null) {
@@ -92,11 +90,15 @@ class PlayerViewModel @Inject constructor(
     private fun startProgressTracker() {
         stopProgressTracker()
         progressJob = viewModelScope.launch {
-            while (true) { delay(200); playerManager.updateProgress() }
+            while (true) {
+                delay(200)
+                playerManager.updateProgress()
+            }
         }
     }
 
     private fun stopProgressTracker() {
-        progressJob?.cancel(); progressJob = null
+        progressJob?.cancel()
+        progressJob = null
     }
 }

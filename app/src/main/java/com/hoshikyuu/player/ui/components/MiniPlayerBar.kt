@@ -1,4 +1,4 @@
-﻿package com.hoshikyuu.player.ui.components
+package com.hoshikyuu.player.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -11,9 +11,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,7 +65,7 @@ fun MiniPlayerBar(
                             .data(song.coverUrl)
                             .crossfade(true)
                             .build(),
-                        contentDescription = "专辑封面",
+                        contentDescription = "專輯封面",
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(8.dp)),
@@ -96,13 +95,12 @@ fun MiniPlayerBar(
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause
                             else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            contentDescription = if (isPlaying) "暫停" else "播放",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(32.dp)
                         )
                     }
 
-                    // 播放隊列按鈕（顯示佇列數量）
                     BadgedBox(badge = {
                         if (queue.isNotEmpty()) {
                             Badge { Text("${queue.size}", style = MaterialTheme.typography.labelSmall) }

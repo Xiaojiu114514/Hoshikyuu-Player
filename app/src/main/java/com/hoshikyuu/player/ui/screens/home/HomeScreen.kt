@@ -42,10 +42,10 @@ fun HomeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
     val trendingState by viewModel.trendingSongs.collectAsState()
     val recommendedState by viewModel.recommendedSongs.collectAsState()
     val favoriteIds by playerManager.favoriteIds.collectAsState()
-
     val showMobileWarning by viewModel.showMobileDataWarning.collectAsState()
 
     val avatarRepo = remember {
@@ -60,9 +60,9 @@ fun HomeScreen(
             text = {
                 Text(
                     "当前正在使用移动数据网络，加载数据将消耗流量。\n\n" +
-                    "点击「继续」将允许使用移动网络，\n" +
-                    "点击「取消」将只使用本地缓存数据，\n" +
-                    "所有网络请求将被禁止。"
+                            "点击「继续」将允许使用移动网络，\n" +
+                            "点击「取消」将只使用本地缓存数据，\n" +
+                            "所有网络请求将被禁止。"
                 )
             },
             confirmButton = {
@@ -92,43 +92,20 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Hoshikyuu",
-                            style = MaterialTheme.typography.displayLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "探索你的音樂之旅",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("Hoshikyuu", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(2.dp))
+                        Text("探索你的音樂之旅", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (avatarUri != null) {
                         AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(avatarUri)
-                                .crossfade(true)
-                                .build(),
+                            model = ImageRequest.Builder(context).data(avatarUri).crossfade(true).build(),
                             contentDescription = "头像",
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape),
+                            modifier = Modifier.size(48.dp).clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = CircleShape,
-                            color = BrandMint.copy(alpha = 0.2f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "个人中心",
-                                tint = BrandMint,
-                                modifier = Modifier.padding(10.dp)
-                            )
+                        Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = BrandMint.copy(alpha = 0.2f)) {
+                            Icon(Icons.Default.Person, null, tint = BrandMint, modifier = Modifier.padding(10.dp))
                         }
                     }
                 }
@@ -138,7 +115,6 @@ fun HomeScreen(
             when (val state = trendingState) {
                 is UiState.Loading -> item { LoadingIndicator(modifier = Modifier.height(200.dp)) }
                 is UiState.Error -> item { ErrorMessage(state.message) }
-                is UiState.Idle -> {}
                 is UiState.Success -> {
                     items(state.data.take(10)) { song ->
                         SongItem(
@@ -152,21 +128,13 @@ fun HomeScreen(
                                     onClick = {
                                         val success = viewModel.addSongToQueue(song)
                                         scope.launch {
-                                            if (success) {
-                                                snackbarHostState.showSnackbar("已加入播放列表：${song.name}")
-                                            } else {
-                                                snackbarHostState.showSnackbar("歌曲已在播放列表中")
-                                            }
+                                            if (success) snackbarHostState.showSnackbar("已加入播放列表：${song.name}")
+                                            else snackbarHostState.showSnackbar("歌曲已在播放列表中")
                                         }
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.PlaylistAdd,
-                                        contentDescription = "加入播放列表",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Icon(Icons.Default.PlaylistAdd, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                                 }
                             },
                             isFavorite = favoriteIds.contains(song.id),
@@ -174,11 +142,8 @@ fun HomeScreen(
                             onDownload = {
                                 viewModel.downloadSong(song) { result ->
                                     scope.launch {
-                                        if (result.isSuccess) {
-                                            snackbarHostState.showSnackbar("下载完成：${song.name}")
-                                        } else {
-                                            snackbarHostState.showSnackbar("下载失败：${result.exceptionOrNull()?.message}")
-                                        }
+                                        if (result.isSuccess) snackbarHostState.showSnackbar("下载完成：${song.name}")
+                                        else snackbarHostState.showSnackbar("下载失败：${result.exceptionOrNull()?.message}")
                                     }
                                 }
                             },
@@ -186,16 +151,16 @@ fun HomeScreen(
                         )
                     }
                 }
+                is UiState.Idle -> {}
             }
 
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
                 SectionHeader("新歌榜單")
             }
             when (val state = recommendedState) {
                 is UiState.Loading -> item { LoadingIndicator(modifier = Modifier.height(200.dp)) }
                 is UiState.Error -> item { ErrorMessage(state.message) }
-                is UiState.Idle -> {}
                 is UiState.Success -> {
                     items(state.data.take(10)) { song ->
                         SongItem(
@@ -209,21 +174,13 @@ fun HomeScreen(
                                     onClick = {
                                         val success = viewModel.addSongToQueue(song)
                                         scope.launch {
-                                            if (success) {
-                                                snackbarHostState.showSnackbar("已加入播放列表：${song.name}")
-                                            } else {
-                                                snackbarHostState.showSnackbar("歌曲已在播放列表中")
-                                            }
+                                            if (success) snackbarHostState.showSnackbar("已加入播放列表：${song.name}")
+                                            else snackbarHostState.showSnackbar("歌曲已在播放列表中")
                                         }
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.PlaylistAdd,
-                                        contentDescription = "加入播放列表",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Icon(Icons.Default.PlaylistAdd, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                                 }
                             },
                             isFavorite = favoriteIds.contains(song.id),
@@ -231,11 +188,8 @@ fun HomeScreen(
                             onDownload = {
                                 viewModel.downloadSong(song) { result ->
                                     scope.launch {
-                                        if (result.isSuccess) {
-                                            snackbarHostState.showSnackbar("下载完成：${song.name}")
-                                        } else {
-                                            snackbarHostState.showSnackbar("下载失败：${result.exceptionOrNull()?.message}")
-                                        }
+                                        if (result.isSuccess) snackbarHostState.showSnackbar("下载完成：${song.name}")
+                                        else snackbarHostState.showSnackbar("下载失败：${result.exceptionOrNull()?.message}")
                                     }
                                 }
                             },
@@ -243,17 +197,13 @@ fun HomeScreen(
                         )
                     }
                 }
+                is UiState.Idle -> {}
             }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            item { Spacer(Modifier.height(80.dp)) }
         }
 
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp)
-        )
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp))
     }
 }
 
@@ -265,11 +215,6 @@ private fun SectionHeader(title: String) {
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
     }
 }

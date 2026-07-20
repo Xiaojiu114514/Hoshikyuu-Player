@@ -56,34 +56,21 @@ class PlaylistViewModel @Inject constructor(
         viewModelScope.launch { repository.removeSongFromPlaylist(playlistId, songId) }
     }
 
-    fun playSong(song: Song) {
-        playerManager.play(song)
-    }
-
-    fun playSongWithDetail(song: Song) {
-        playerManager.play(song)
-    }
+    fun playSongWithDetail(song: Song) = playerManager.play(song)
 
     fun addSongToQueueWithDetail(song: Song): Boolean {
-        if (playerManager.isSongInQueue(song.id)) {
-            return false
-        }
+        if (playerManager.isSongInQueue(song.id)) return false
         playerManager.addToQueueAfterCurrent(song)
         return true
     }
 
-    // 下载歌曲 - 返回 Uri
     fun downloadSong(song: Song, onResult: (Result<Uri>) -> Unit = {}) {
         viewModelScope.launch {
-            val detailResult = withContext(Dispatchers.IO) {
-                musicRepository.fetchSongDetailForce(song.id, song.source)
-            }
-            if (detailResult.isSuccess) {
-                val fullSong = detailResult.getOrNull()!!
-                downloadManager.downloadSong(fullSong, onResult)
+            val detail = musicRepository.fetchSongDetailForce(song.id, song.source)
+            if (detail.isSuccess) {
+                downloadManager.downloadSong(detail.getOrNull()!!, onResult)
             } else {
-                val error = detailResult.exceptionOrNull() ?: Exception("无法获取歌曲下载链接")
-                onResult(Result.failure(error))
+                onResult(Result.failure(detail.exceptionOrNull() ?: Exception("无法获取歌曲信息")))
             }
         }
     }

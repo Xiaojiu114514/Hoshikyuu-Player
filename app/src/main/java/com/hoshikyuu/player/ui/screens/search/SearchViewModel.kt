@@ -44,12 +44,10 @@ class SearchViewModel @Inject constructor(
 
     fun onSearch(query: String) {
         if (query.isBlank()) return
-
         if (!networkPreferenceManager.isMobileNetworkAllowed()) {
             _searchState.value = UiState.Error("网络已禁用，请连接WiFi后搜索")
             return
         }
-
         addToHistory(query.trim())
         doSearch(query.trim())
     }
@@ -65,10 +63,6 @@ class SearchViewModel @Inject constructor(
 
     fun clearHistory() { _searchHistory.value = emptyList() }
 
-    fun removeFromHistory(query: String) {
-        _searchHistory.value = _searchHistory.value.filter { it != query }
-    }
-
     private fun addToHistory(query: String) {
         val h = _searchHistory.value.toMutableList()
         h.remove(query); h.add(0, query)
@@ -79,43 +73,30 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             _searchState.value = UiState.Loading
             repository.searchSongs(query)
-                .onSuccess { songs ->
-                    _searchState.value = UiState.Success(songs)
-                }
-                .onFailure { e ->
-                    _searchState.value = UiState.Error(e.message ?: "搜索失敗")
-                }
+                .onSuccess { songs -> _searchState.value = UiState.Success(songs) }
+                .onFailure { e -> _searchState.value = UiState.Error(e.message ?: "搜索失敗") }
         }
     }
 
     fun addSongToQueueWithSong(song: Song): Boolean {
-        if (playerManager.isSongInQueue(song.id)) {
-            return false
-        }
+        if (playerManager.isSongInQueue(song.id)) return false
         playerManager.addToQueueAfterCurrent(song)
         return true
     }
 
-    fun playSong(song: Song) {
-        playerManager.play(song)
-    }
+    fun playSong(song: Song) = playerManager.play(song)
 
-    // 下载歌曲 - 返回 Uri
     fun downloadSong(song: Song, onResult: (Result<Uri>) -> Unit = {}) {
         if (!networkPreferenceManager.isMobileNetworkAllowed()) {
             onResult(Result.failure(Exception("网络已禁用，请连接WiFi后下载")))
             return
         }
         viewModelScope.launch {
-            val detailResult = withContext(Dispatchers.IO) {
-                repository.fetchSongDetailForce(song.id, song.source)
-            }
-            if (detailResult.isSuccess) {
-                val fullSong = detailResult.getOrNull()!!
-                downloadManager.downloadSong(fullSong, onResult)
+            val detail = repository.fetchSongDetailForce(song.id, song.source)
+            if (detail.isSuccess) {
+                downloadManager.downloadSong(detail.getOrNull()!!, onResult)
             } else {
-                val error = detailResult.exceptionOrNull() ?: Exception("无法获取歌曲下载链接")
-                onResult(Result.failure(error))
+                onResult(Result.failure(detail.exceptionOrNull() ?: Exception("无法获取歌曲信息")))
             }
         }
     }

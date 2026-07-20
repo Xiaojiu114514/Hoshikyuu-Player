@@ -80,13 +80,11 @@ fun DownloadManagementScreen(
                     SongItem(
                         song = song,
                         onClick = {
-                            // 直接播放本地文件（PlayerManager 已支持本地路径检测）
                             playerManager.play(song)
                             navController.navigate(Screen.FullPlayer.createRoute(song.id))
                         },
                         trailing = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                // 添加到播放队列
                                 IconButton(
                                     onClick = {
                                         if (!playerManager.isSongInQueue(song.id)) {
@@ -110,7 +108,6 @@ fun DownloadManagementScreen(
                                     )
                                 }
 
-                                // 三点菜单（收藏 / 删除下载）
                                 Box {
                                     IconButton(
                                         onClick = { menuExpanded = !menuExpanded },
@@ -171,7 +168,7 @@ fun DownloadManagementScreen(
                         },
                         isFavorite = favoriteIds.contains(song.id),
                         onToggleFavorite = { /* 已在菜单中处理，此处留空 */ },
-                        showOverflowMenu = false,   // 不使用内置三点菜单
+                        showOverflowMenu = false,
                         onDownload = null,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                     )

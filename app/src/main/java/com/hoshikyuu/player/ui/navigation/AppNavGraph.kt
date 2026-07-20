@@ -70,7 +70,6 @@ fun AppNavGraph(
                 playerManager = playerManager
             )
         }
-        // 新增
         composable(Screen.Setting.route) {
             SettingScreen(navController = navController)
         }

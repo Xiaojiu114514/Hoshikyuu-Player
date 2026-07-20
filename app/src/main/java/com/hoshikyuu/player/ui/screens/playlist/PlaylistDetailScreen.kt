@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.hoshikyuu.player.domain.Song  // 添加导入
 import com.hoshikyuu.player.player.PlayerManager
 import com.hoshikyuu.player.ui.components.SongItem
 import com.hoshikyuu.player.ui.navigation.Screen
@@ -68,13 +69,14 @@ fun PlaylistDetailScreen(
                 contentPadding = PaddingValues(12.dp)
             ) {
                 items(songs) { entity ->
-                    val song = com.hoshikyuu.player.domain.Song(
+                    val song = Song(
                         id = entity.songId,
                         name = entity.songName,
                         album = entity.songAlbum,
                         artist = entity.songArtist,
                         coverUrl = entity.songCoverUrl,
                         mp3Url = entity.songMp3Url,
+                        lrc = "",  // 从实体中可能没有，可留空
                         source = entity.source
                     )
                     SongItem(
@@ -89,32 +91,19 @@ fun PlaylistDetailScreen(
                                     onClick = {
                                         val success = viewModel.addSongToQueueWithDetail(song)
                                         scope.launch {
-                                            if (success) {
-                                                snackbarHostState.showSnackbar("已加入播放列表：${song.name}")
-                                            } else {
-                                                snackbarHostState.showSnackbar("歌曲已在播放列表中")
-                                            }
+                                            if (success) snackbarHostState.showSnackbar("已加入播放列表：${song.name}")
+                                            else snackbarHostState.showSnackbar("歌曲已在播放列表中")
                                         }
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.PlaylistAdd,
-                                        "加入播放列表",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Icon(Icons.Default.PlaylistAdd, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                                 }
                                 IconButton(
                                     onClick = { viewModel.removeSongFromPlaylist(playlistId, song.id) },
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        "移除",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                                 }
                             }
                         },
@@ -123,11 +112,8 @@ fun PlaylistDetailScreen(
                         onDownload = {
                             viewModel.downloadSong(song) { result ->
                                 scope.launch {
-                                    if (result.isSuccess) {
-                                        snackbarHostState.showSnackbar("下载完成：${song.name}")
-                                    } else {
-                                        snackbarHostState.showSnackbar("下载失败：${result.exceptionOrNull()?.message}")
-                                    }
+                                    if (result.isSuccess) snackbarHostState.showSnackbar("下载完成：${song.name}")
+                                    else snackbarHostState.showSnackbar("下载失败：${result.exceptionOrNull()?.message}")
                                 }
                             }
                         },
@@ -139,8 +125,5 @@ fun PlaylistDetailScreen(
         }
     }
 
-    SnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier.padding(16.dp)
-    )
+    SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(16.dp))
 }

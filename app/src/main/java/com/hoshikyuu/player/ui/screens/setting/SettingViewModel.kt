@@ -32,6 +32,9 @@ class SettingViewModel @Inject constructor(
     private val _fileNameFormat = MutableStateFlow(settingRepo.getFileNameFormat())
     val fileNameFormat: StateFlow<Int> = _fileNameFormat.asStateFlow()
 
+    private val _saveLyrics = MutableStateFlow(settingRepo.shouldSaveLyrics())
+    val saveLyrics: StateFlow<Boolean> = _saveLyrics.asStateFlow()
+
     private val _cacheSize = MutableStateFlow(0L)
     val cacheSize: StateFlow<Long> = _cacheSize.asStateFlow()
 
@@ -52,6 +55,11 @@ class SettingViewModel @Inject constructor(
         _fileNameFormat.value = format
     }
 
+    fun setSaveLyrics(save: Boolean) {
+        settingRepo.setSaveLyrics(save)
+        _saveLyrics.value = save
+    }
+
     fun clearCache(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
@@ -60,7 +68,7 @@ class SettingViewModel @Inject constructor(
                 songCacheDao.clearAllCache()
                 updateSizes()
                 onResult(true)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 onResult(false)
             }
         }
@@ -76,15 +84,13 @@ class SettingViewModel @Inject constructor(
                 context.getDatabasePath("hoshikyuu_player.db").delete()
                 context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit().clear().apply()
                 avatarRepo.deleteAvatar()
-                val songsDir = File(context.filesDir, "songs")
-                if (songsDir.exists()) songsDir.deleteRecursively()
-                val cacheSongsDir = File(context.filesDir, "cache/songs")
-                if (cacheSongsDir.exists()) cacheSongsDir.deleteRecursively()
-                songsDir.mkdirs()
-                cacheSongsDir.mkdirs()
+                File(context.filesDir, "songs").deleteRecursively()
+                File(context.filesDir, "cache/songs").deleteRecursively()
+                File(context.filesDir, "songs").mkdirs()
+                File(context.filesDir, "cache/songs").mkdirs()
                 updateSizes()
                 onResult(true)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 onResult(false)
             }
         }
@@ -105,15 +111,14 @@ class SettingViewModel @Inject constructor(
     }
 
     private fun calculateDataSize(): Long {
-        val songsDir = File(context.filesDir, "songs")
-        val cacheDir = File(context.filesDir, "cache/songs")
-        val dbFile = context.getDatabasePath("hoshikyuu_player.db")
-        val prefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
-        var total = 0L
-        if (songsDir.exists()) total += songsDir.walk().filter { it.isFile }.sumOf { it.length() }
-        if (cacheDir.exists()) total += cacheDir.walk().filter { it.isFile }.sumOf { it.length() }
-        if (dbFile.exists()) total += dbFile.length()
-        if (prefsDir.exists()) total += prefsDir.walk().filter { it.isFile }.sumOf { it.length() }
-        return total
+        val dirs = listOf(
+            File(context.filesDir, "songs"),
+            File(context.filesDir, "cache/songs"),
+            context.getDatabasePath("hoshikyuu_player.db"),
+            File(context.applicationInfo.dataDir, "shared_prefs")
+        )
+        return dirs.sumOf { dir ->
+            if (dir.exists()) dir.walk().filter { it.isFile }.sumOf { it.length() } else 0L
+        }
     }
 }

@@ -56,9 +56,7 @@ fun FullPlayerScreen(
     var isLyricsFullscreen by remember { mutableStateOf(false) }
 
     LaunchedEffect(errorMessage) {
-        errorMessage?.let {
-            snackbarHostState.showSnackbar(it)
-        }
+        errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
 
     val song = (songState as? UiState.Success)?.data
@@ -146,8 +144,7 @@ fun FullPlayerScreen(
                                             if (result.isSuccess) {
                                                 snackbarHostState.showSnackbar("下载完成：${song?.name ?: "歌曲"}")
                                             } else {
-                                                val msg = result.exceptionOrNull()?.message ?: "下载失败"
-                                                snackbarHostState.showSnackbar(msg)
+                                                snackbarHostState.showSnackbar("下载失败：${result.exceptionOrNull()?.message}")
                                             }
                                         }
                                     }
@@ -506,7 +503,6 @@ fun FullPlayerScreen(
             }
         }
 
-        // 加入歌单对话框
         if (showPlaylistDialog) {
             val plVm: PlaylistViewModel = hiltViewModel()
             val playlistList by plVm.playlists.collectAsState()

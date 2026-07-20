@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -62,10 +61,7 @@ class HomeViewModel @Inject constructor(
                 return@launch
             }
 
-            val isMobileData = withContext(Dispatchers.IO) {
-                networkUtils.isMobileData()
-            }
-
+            val isMobileData = withContext(Dispatchers.IO) { networkUtils.isMobileData() }
             if (isMobileData) {
                 _showMobileDataWarning.value = true
             } else {
@@ -100,23 +96,13 @@ class HomeViewModel @Inject constructor(
 
     private fun loadCachedDataOnly() {
         viewModelScope.launch {
-            val trendingCached = withContext(Dispatchers.IO) {
-                cacheRepository.getCachedRanking("3778678")
-            }
-            if (trendingCached != null && trendingCached.isNotEmpty()) {
-                _trendingSongs.value = UiState.Success(trendingCached)
-            } else {
-                _trendingSongs.value = UiState.Error("网络已禁用，且无本地缓存")
-            }
+            val trending = cacheRepository.getCachedRanking("3778678")
+            _trendingSongs.value = if (trending != null && trending.isNotEmpty())
+                UiState.Success(trending) else UiState.Error("网络已禁用，且无本地缓存")
 
-            val recommendedCached = withContext(Dispatchers.IO) {
-                cacheRepository.getCachedRanking("3779629")
-            }
-            if (recommendedCached != null && recommendedCached.isNotEmpty()) {
-                _recommendedSongs.value = UiState.Success(recommendedCached)
-            } else {
-                _recommendedSongs.value = UiState.Error("网络已禁用，且无本地缓存")
-            }
+            val recommended = cacheRepository.getCachedRanking("3779629")
+            _recommendedSongs.value = if (recommended != null && recommended.isNotEmpty())
+                UiState.Success(recommended) else UiState.Error("网络已禁用，且无本地缓存")
         }
     }
 
@@ -131,101 +117,59 @@ class HomeViewModel @Inject constructor(
         stateFlow: MutableStateFlow<UiState<List<Song>>>
     ) {
         viewModelScope.launch {
-            val isValid = withContext(Dispatchers.IO) {
-                cacheRepository.isValidCache(rankingId)
-            }
-
-            if (isValid) {
-                val cachedSongs = withContext(Dispatchers.IO) {
-                    cacheRepository.getCachedRanking(rankingId)
-                }
-                if (cachedSongs != null && cachedSongs.isNotEmpty()) {
-                    stateFlow.value = UiState.Success(cachedSongs)
+            if (cacheRepository.isValidCache(rankingId)) {
+                val cached = cacheRepository.getCachedRanking(rankingId)
+                if (cached != null && cached.isNotEmpty()) {
+                    stateFlow.value = UiState.Success(cached)
                     return@launch
                 }
             }
 
             if (!networkPreferenceManager.isMobileNetworkAllowed()) {
-                val cachedSongs = withContext(Dispatchers.IO) {
-                    cacheRepository.getCachedRanking(rankingId)
-                }
-                if (cachedSongs != null && cachedSongs.isNotEmpty()) {
-                    stateFlow.value = UiState.Success(cachedSongs)
-                } else {
-                    stateFlow.value = UiState.Error("网络已禁用，请连接WiFi后重试")
-                }
+                val cached = cacheRepository.getCachedRanking(rankingId)
+                stateFlow.value = if (cached != null && cached.isNotEmpty())
+                    UiState.Success(cached) else UiState.Error("网络已禁用，请连接WiFi后重试")
                 return@launch
             }
 
-            fetchRankingFromApi(rankingId, rankingName, stateFlow)
-        }
-    }
-
-    private suspend fun fetchRankingFromApi(
-        rankingId: String,
-        rankingName: String,
-        stateFlow: MutableStateFlow<UiState<List<Song>>>
-    ) {
-        stateFlow.value = UiState.Loading
-        try {
-            val result = withContext(Dispatchers.IO) {
-                repository.getRanking(rankingId, "wy")
-            }
-            result.onSuccess { songs ->
-                withContext(Dispatchers.IO) {
+            stateFlow.value = UiState.Loading
+            try {
+                val result = withContext(Dispatchers.IO) { repository.getRanking(rankingId, "wy") }
+                result.onSuccess { songs ->
                     cacheRepository.saveRanking(rankingId, rankingName, songs)
+                    stateFlow.value = UiState.Success(songs)
+                }.onFailure { e ->
+                    val cached = cacheRepository.getCachedRanking(rankingId)
+                    stateFlow.value = if (cached != null && cached.isNotEmpty())
+                        UiState.Success(cached) else UiState.Error(e.message ?: "加载失败")
                 }
-                stateFlow.value = UiState.Success(songs)
-            }.onFailure { e ->
-                val cachedSongs = withContext(Dispatchers.IO) {
-                    cacheRepository.getCachedRanking(rankingId)
-                }
-                if (cachedSongs != null && cachedSongs.isNotEmpty()) {
-                    stateFlow.value = UiState.Success(cachedSongs)
-                } else {
-                    stateFlow.value = UiState.Error(e.message ?: "加载失败")
-                }
-            }
-        } catch (e: Exception) {
-            val cachedSongs = withContext(Dispatchers.IO) {
-                cacheRepository.getCachedRanking(rankingId)
-            }
-            if (cachedSongs != null && cachedSongs.isNotEmpty()) {
-                stateFlow.value = UiState.Success(cachedSongs)
-            } else {
-                stateFlow.value = UiState.Error(e.message ?: "加载失败")
+            } catch (e: Exception) {
+                val cached = cacheRepository.getCachedRanking(rankingId)
+                stateFlow.value = if (cached != null && cached.isNotEmpty())
+                    UiState.Success(cached) else UiState.Error(e.message ?: "加载失败")
             }
         }
     }
 
-    fun playSong(song: Song) {
-        playerManager.play(song)
-    }
+    fun playSong(song: Song) = playerManager.play(song)
 
     fun addSongToQueue(song: Song): Boolean {
-        if (playerManager.isSongInQueue(song.id)) {
-            return false
-        }
+        if (playerManager.isSongInQueue(song.id)) return false
         playerManager.addToQueueAfterCurrent(song)
         return true
     }
 
-    // 下载歌曲 - 返回 Uri
     fun downloadSong(song: Song, onResult: (Result<Uri>) -> Unit = {}) {
         if (!networkPreferenceManager.isMobileNetworkAllowed()) {
             onResult(Result.failure(Exception("网络已禁用，请连接WiFi后下载")))
             return
         }
         viewModelScope.launch {
-            val detailResult = withContext(Dispatchers.IO) {
-                repository.fetchSongDetailForce(song.id, song.source)
-            }
-            if (detailResult.isSuccess) {
-                val fullSong = detailResult.getOrNull()!!
-                downloadManager.downloadSong(fullSong, onResult)
+            val detail = repository.fetchSongDetailForce(song.id, song.source)
+            if (detail.isSuccess) {
+                downloadManager.downloadSong(detail.getOrNull()!!, onResult)
             } else {
-                val error = detailResult.exceptionOrNull() ?: Exception("无法获取歌曲下载链接")
-                onResult(Result.failure(error))
+                onResult(Result.failure(detail.exceptionOrNull() ?: Exception("无法获取歌曲信息")))
             }
         }
     }
