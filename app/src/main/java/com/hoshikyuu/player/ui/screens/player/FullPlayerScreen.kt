@@ -34,6 +34,7 @@ import com.hoshikyuu.player.ui.components.ErrorMessage
 import com.hoshikyuu.player.ui.screens.playlist.PlaylistViewModel
 import com.hoshikyuu.player.ui.theme.*
 import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun FullPlayerScreen(
@@ -53,10 +54,16 @@ fun FullPlayerScreen(
     val lyricLines by viewModel.lyricLines.collectAsState()
     val errorMessage by viewModel.playerManager.errorMessage.collectAsState()
 
+    // 桌面歌词状态
+    val desktopLyricsEnabled by viewModel.desktopLyricsEnabled.collectAsState()
+    val desktopLyricsLocked by viewModel.desktopLyricsLocked.collectAsState()
+
     var isLyricsFullscreen by remember { mutableStateOf(false) }
 
     LaunchedEffect(errorMessage) {
-        errorMessage?.let { snackbarHostState.showSnackbar(it) }
+        errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+        }
     }
 
     val song = (songState as? UiState.Success)?.data
@@ -120,6 +127,37 @@ fun FullPlayerScreen(
                         )
                     }
                     Spacer(modifier = Modifier.weight(1f))
+
+                    // ========== 新增桌面歌词开关按钮 ==========
+                    IconButton(
+                        onClick = { viewModel.toggleDesktopLyrics() }
+                    ) {
+                        when {
+                            // 锁定状态：显示解锁图标
+                            desktopLyricsLocked -> {
+                                Icon(
+                                    Icons.Default.LockOpen,
+                                    contentDescription = "解锁桌面歌词",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            else -> {
+                                // 未锁定：显示“词”字，颜色根据启用状态变化
+                                Text(
+                                    text = "词",
+                                    color = if (desktopLyricsEnabled) Color.White else Color.Gray,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .wrapContentSize(Alignment.Center)
+                                )
+                            }
+                        }
+                    }
+                    // ========================================
+
                     Box {
                         var showMenu by remember { mutableStateOf(false) }
                         IconButton(onClick = { showMenu = true }) {
@@ -144,7 +182,8 @@ fun FullPlayerScreen(
                                             if (result.isSuccess) {
                                                 snackbarHostState.showSnackbar("下载完成：${song?.name ?: "歌曲"}")
                                             } else {
-                                                snackbarHostState.showSnackbar("下载失败：${result.exceptionOrNull()?.message}")
+                                                val msg = result.exceptionOrNull()?.message ?: "下载失败"
+                                                snackbarHostState.showSnackbar(msg)
                                             }
                                         }
                                     }
@@ -246,6 +285,7 @@ fun FullPlayerScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        // 歌词区域
                         val currentPosMs = (progress * durationMillis).toLong()
                         val currentLyricIdx = viewModel.getLyricIndex(currentPosMs)
                         val lyricsListState = rememberLazyListState()
@@ -300,6 +340,7 @@ fun FullPlayerScreen(
 
                         Spacer(modifier = Modifier.weight(0.5f))
 
+                        // 播放控制
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -406,7 +447,7 @@ fun FullPlayerScreen(
             }
         }
 
-        // 全屏歌词
+        // 全屏歌词（保持不变）
         if (isLyricsFullscreen) {
             Box(
                 modifier = Modifier
@@ -503,6 +544,7 @@ fun FullPlayerScreen(
             }
         }
 
+        // 加入歌单对话框（保持不变）
         if (showPlaylistDialog) {
             val plVm: PlaylistViewModel = hiltViewModel()
             val playlistList by plVm.playlists.collectAsState()

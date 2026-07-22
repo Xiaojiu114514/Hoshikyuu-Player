@@ -23,7 +23,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -64,8 +64,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
 
-    implementation("androidx.media3:media3-exoplayer:1.5.1")
-    implementation("androidx.media3:media3-session:1.5.1")
+    implementation("androidx.media3:media3-exoplayer:1.7.0")
+    implementation("androidx.media3:media3-session:1.7.0")
+    implementation("androidx.media3:media3-ui:1.7.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     // ========== 新增 Room 依赖 ==========
@@ -75,4 +76,5 @@ dependencies {
 
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation ("com.google.code.gson:gson:2.10.1")
+
 }

@@ -27,8 +27,9 @@
 | 个人头像（相册选取 / Bitmap 压缩） | ✅ |
 | 搜索历史（最近 10 条标签） | ✅ |
 | 首页推荐（热歌榜 + 新歌榜） | ✅ |
-| 动态主题色 | 🚧 |
-| 桌面 / 状态栏歌词 | ❌ |
+| 桌面歌词 | ✅ |
+| 通知栏控制 | ✅ |
+| 系统媒体控制中心（MediaSession）对接 | ✅ |
 
 ---
 
@@ -75,16 +76,19 @@ com.hoshikyuu.player/
 │   │   ├── SongCacheRepository   #   歌曲缓存元数据
 │   │   ├── RankingCacheRepository#   排行榜缓存
 │   │   ├── SettingRepository     #   设置持久化
-│   │   └── AvatarRepository      #   头像管理
+│   │   ├── AvatarRepository      #   头像管理
+│   │   └── LocalSongRepository   #   本地歌曲扫描
 ├── di/                            # Hilt 依赖注入（16 个 Provider）
 ├── domain/
 │   ├── Models.kt                 # Song / Playlist / UiState 核心模型
 │   └── usecase/                  # （预留，尚无实现）
 ├── player/
-│   ├── PlayerManager.kt          # ExoPlayer 状态管理器（~600 行）
+│   ├── PlayerManager.kt          # ExoPlayer 状态管理器
 │   ├── MusicService.kt           # MediaSessionService 后台播放
 │   ├── PlayerController.kt       # MediaController 封装
-│   └── DownloadManager.kt        # OkHttp 流式下载缓存
+│   ├── DownloadManager.kt        # OkHttp 流式下载缓存
+│   ├── DesktopLyricsManager.kt   # 桌面歌词状态管理
+│   └── LyricsOverlayService.kt   # 桌面歌词悬浮窗服务
 ├── ui/
 │   ├── components/
 │   │   ├── MiniPlayerBar         #   底部悬浮播放条
@@ -99,8 +103,8 @@ com.hoshikyuu.player/
 │   │   ├── library/              #   音乐库（收藏 / 歌单 / 历史 / 下载）
 │   │   ├── playlist/             #   歌单列表 + 歌单详情
 │   │   ├── download/             #   下载管理
-│   │   └── setting/              #   设置
-│   ├── theme/                    #   主题色 / 排版 / 动态色彩
+│   │   ├── setting/              #   设置
+│   │   └── local/                #   本地歌曲列表
 │   └── utils/
 │       └── LyricParser.kt        #   LRC 歌词解析器
 ├── HoshikyuuApp.kt               # Application 入口
@@ -111,13 +115,15 @@ com.hoshikyuu.player/
 
 ```
 用户点击播放
-  ├─ getLocalSong() 检查本地文件
-  │   ├─ 下载目录 → 找到 → playInternalDirect()
-  │   ├─ 缓存目录 → 找到 → playInternalDirect()
-  │   └─ 未找到 → fetchSongDetailForce() 从 API 获取 mp3Url + lrc
-  │       ├─ playInternal() 流式播放
-  │       └─ cacheSongForOffline() 异步缓存
-  └─ 添加到播放历史
+  ├─ 检查本地缓存（下载/缓存目录）
+  │   ├─ 找到 → 直接播放（含歌词加载）
+  │   └─ 未找到 → 检查是否为本地文件路径
+  │       ├─ 是 → 加载歌词（同目录 .lrc）→ 播放
+  │       └─ 否 → 网络请求详情 API（mp3Url + lrc）
+  │           ├─ 成功 → 播放 + 异步缓存
+  │           └─ 失败 → 显示错误
+  ├─ 更新播放状态（currentSong / isPlaying / progress / duration）
+  └─ 同步到系统媒体控制中心（MediaSession）
 ```
 
 PlayerManager 通过 StateFlow 暴露全部播放状态：`currentSong` / `isPlaying` / `progress` / `duration` / `queue` / `currentIndex` / `repeatMode` / `favoriteIds` / `favoriteSongs` / `playHistory` / `errorMessage`。
@@ -232,7 +238,7 @@ PlayerManager 开始流式播放 + 异步缓存至本地
 
 ## 项目规模
 
-- 58 个 Kotlin 源文件，约 5,250 行代码
+- 约 65 个 Kotlin 源文件，约 5,800 行代码
 - 单一 `main` 分支
 
 ---
@@ -241,9 +247,8 @@ PlayerManager 开始流式播放 + 异步缓存至本地
 
 | 项目 | 说明 |
 |------|------|
-| PlayerManager 职责较重 | 同时管理播放状态、队列、缓存、收藏、历史（~600 行） |
+| PlayerManager 职责较重 | 同时管理播放状态、队列、缓存、收藏、历史、歌词加载（~650 行） |
 | domain/usecase/ 为空 | 部分业务逻辑分散在 ViewModel 与 PlayerManager 中 |
-| 动态主题色 | 仅保留占位渐变，尚未实现从专辑封面提取主色 |
 | 测试 | 尚未编写单元测试与 UI 测试 |
 | 多模块拆分 | 可拆分为 `:core-player`、`:feature-home` 等独立模块 |
 | 崩溃收集 | 可接入 Firebase Crashlytics 或 Sentry |

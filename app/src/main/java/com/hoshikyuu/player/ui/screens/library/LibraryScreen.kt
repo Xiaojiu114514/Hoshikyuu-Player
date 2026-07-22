@@ -186,6 +186,15 @@ fun LibraryScreen(
             badge = "${playlists.size} 个",
             onClick = { navController.navigate(Screen.PlaylistList.route) }
         ),
+        // ========== 新增：本地歌曲 ==========
+        LibraryMenuItem(
+            "本地歌曲",
+            "扫描手机中的音乐文件",
+            icon = { Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.tertiary) },
+            badge = "",
+            onClick = { navController.navigate(Screen.LocalSongs.route) }
+        ),
+        // ====================================
         LibraryMenuItem(
             "下载管理",
             "离线音乐",

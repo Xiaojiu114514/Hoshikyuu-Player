@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hoshikyuu.player.domain.Song
 import com.hoshikyuu.player.domain.UiState
+import com.hoshikyuu.player.player.DesktopLyricsManager
 import com.hoshikyuu.player.player.DownloadManager
 import com.hoshikyuu.player.player.PlayerManager
 import com.hoshikyuu.player.player.RepeatMode
@@ -20,8 +21,13 @@ import javax.inject.Inject
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     val playerManager: PlayerManager,
-    private val downloadManager: DownloadManager
+    private val downloadManager: DownloadManager,
+    private val desktopLyricsManager: DesktopLyricsManager   // 新增
 ) : ViewModel() {
+
+    // 桌面歌词状态
+    val desktopLyricsEnabled = desktopLyricsManager.enabled
+    val desktopLyricsLocked = desktopLyricsManager.isLocked
 
     val songState: StateFlow<UiState<Song>> = playerManager.currentSong
         .map { song -> if (song != null) UiState.Success(song) else UiState.Idle }
@@ -47,7 +53,9 @@ class PlayerViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            playerManager.repeatMode.collect { mode -> _repeatMode.value = mode }
+            playerManager.repeatMode.collect { mode ->
+                _repeatMode.value = mode
+            }
         }
         viewModelScope.launch {
             playerManager.isPlaying.collect { playing ->
@@ -56,13 +64,30 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    // ===== 桌面歌词控制方法 =====
+    fun toggleDesktopLyrics() {
+        val enabled = desktopLyricsManager.enabled.value
+        val locked = desktopLyricsManager.isLocked.value
+        if (locked) {
+            // 锁定状态 -> 解锁
+            desktopLyricsManager.setLocked(false)
+        } else {
+            // 未锁定 -> 切换启用/禁用
+            desktopLyricsManager.setEnabled(!enabled)
+        }
+    }
+
+    // ===== 原有方法 =====
     fun togglePlay() = playerManager.togglePlay()
     fun toggleFavorite(song: Song) = playerManager.toggleFavorite(song)
     fun seekTo(fraction: Float) = playerManager.seekTo(fraction)
     fun skipNext() = playerManager.skipNext()
     fun skipPrevious() = playerManager.skipPrevious()
     fun addCurrentToQueue() {
-        playerManager.currentSong.value?.let { playerManager.addToQueueAfterCurrent(it) }
+        val song = playerManager.currentSong.value
+        if (song != null && !playerManager.isSongInQueue(song.id)) {
+            playerManager.addToQueue(song)
+        }
     }
 
     fun getLyricIndex(positionMs: Long): Int {
@@ -100,5 +125,10 @@ class PlayerViewModel @Inject constructor(
     private fun stopProgressTracker() {
         progressJob?.cancel()
         progressJob = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopProgressTracker()
     }
 }

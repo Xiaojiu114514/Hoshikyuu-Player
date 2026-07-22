@@ -11,6 +11,7 @@ import com.hoshikyuu.player.player.PlayerManager
 import com.hoshikyuu.player.ui.screens.download.DownloadManagementScreen
 import com.hoshikyuu.player.ui.screens.home.HomeScreen
 import com.hoshikyuu.player.ui.screens.library.LibraryScreen
+import com.hoshikyuu.player.ui.screens.local.LocalSongsScreen  // 新增导入
 import com.hoshikyuu.player.ui.screens.player.FullPlayerScreen
 import com.hoshikyuu.player.ui.screens.playlist.PlaylistDetailScreen
 import com.hoshikyuu.player.ui.screens.playlist.PlaylistListScreen
@@ -75,6 +76,13 @@ fun AppNavGraph(
         }
         composable(Screen.DownloadManagement.route) {
             DownloadManagementScreen(
+                navController = navController,
+                playerManager = playerManager
+            )
+        }
+        // ========== 新增：本地歌曲 ==========
+        composable(Screen.LocalSongs.route) {
+            LocalSongsScreen(
                 navController = navController,
                 playerManager = playerManager
             )

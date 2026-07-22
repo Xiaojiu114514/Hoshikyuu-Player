@@ -1,19 +1,18 @@
 package com.hoshikyuu.player.player
 
 import android.content.Context
+import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.hoshikyuu.player.data.repository.*
 import com.hoshikyuu.player.domain.Song
+import com.hoshikyuu.player.ui.utils.parseLyrics
 import com.hoshikyuu.player.utils.NetworkPreferenceManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,13 +28,17 @@ class PlayerManager @Inject constructor(
     private val downloadRepository: DownloadRepository,
     private val cacheRepository: SongCacheRepository,
     private val downloadManager: DownloadManager,
-    private val networkPreferenceManager: NetworkPreferenceManager
+    private val networkPreferenceManager: NetworkPreferenceManager,
+    private val desktopLyricsManager: DesktopLyricsManager
 ) {
 
-    private val player: ExoPlayer by lazy {
+    private val exoPlayer: ExoPlayer by lazy {
         ExoPlayer.Builder(context).build()
     }
 
+    fun getPlayer(): ExoPlayer = exoPlayer
+
+    // ---------- StateFlows ----------
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
 
@@ -69,26 +72,96 @@ class PlayerManager @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _currentLyricsLine = MutableStateFlow("")
+    val currentLyricsLine: StateFlow<String> = _currentLyricsLine.asStateFlow()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var lyricsUpdateJob: Job? = null
 
+    // ---------- 辅助 ----------
     fun isSongInQueue(songId: String): Boolean = _queue.value.any { it.id == songId }
-
-    suspend fun isSongDownloaded(songId: String): Boolean =
-        downloadRepository.isDownloaded(songId)
-
+    suspend fun isSongDownloaded(songId: String): Boolean = downloadRepository.isDownloaded(songId)
     fun isNetworkBlocked(): Boolean = networkPreferenceManager.isNetworkBlocked()
 
-    init {
-        player.repeatMode = Player.REPEAT_MODE_ALL
+    // ---------- 构建带元数据的 MediaItem ----------
+    private fun buildMediaItem(song: Song): MediaItem {
+        val metadataBuilder = MediaMetadata.Builder()
+            .setTitle(song.name)
+            .setArtist(song.artist)
+            .setAlbumTitle(song.album)
+        if (!song.coverUrl.isNullOrEmpty()) {
+            try {
+                metadataBuilder.setArtworkUri(Uri.parse(song.coverUrl))
+            } catch (_: Exception) { /* ignore */ }
+        }
+        return MediaItem.Builder()
+            .setUri(song.mp3Url)
+            .setMediaId(song.id)
+            .setMediaMetadata(metadataBuilder.build())
+            .build()
+    }
 
-        player.addListener(object : Player.Listener {
+    // ---------- 确保本地歌曲加载歌词 ----------
+    private fun ensureLocalLyrics(song: Song): Song {
+        if (song.source != "local" &&
+            !song.mp3Url.startsWith("/") &&
+            !song.mp3Url.startsWith("file://") &&
+            !song.mp3Url.startsWith("content://")) {
+            return song
+        }
+        if (!song.lrc.isNullOrEmpty()) {
+            return song
+        }
+        try {
+            val mp3File = File(song.mp3Url)
+            val baseName = mp3File.nameWithoutExtension
+            val lrcFile = File(mp3File.parent, "$baseName.lrc")
+            if (lrcFile.exists()) {
+                val lrcContent = lrcFile.readText()
+                return song.copy(lrc = lrcContent)
+            }
+        } catch (e: Exception) { /* ignore */ }
+        return song
+    }
+
+    // ---------- 同步整个队列到播放器 ----------
+    private fun syncQueueToPlayer(startIndex: Int) {
+        val songs = _queue.value
+        if (songs.isEmpty()) {
+            exoPlayer.stop()
+            return
+        }
+        val mediaItems = songs.map { buildMediaItem(it) }
+        exoPlayer.setMediaItems(mediaItems, startIndex, 0)
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = true
+        applyRepeatMode()
+    }
+
+    // ---------- 应用循环模式 ----------
+    private fun applyRepeatMode() {
+        val exoMode = when (_repeatMode.value) {
+            RepeatMode.NONE -> Player.REPEAT_MODE_OFF
+            RepeatMode.ONE -> Player.REPEAT_MODE_ONE
+            RepeatMode.ALL -> Player.REPEAT_MODE_ALL
+        }
+        exoPlayer.repeatMode = exoMode
+        android.util.Log.d("PlayerManager", "applyRepeatMode: ${_repeatMode.value} -> $exoMode")
+    }
+
+    // ---------- 初始化 ----------
+    init {
+        _repeatMode.value = RepeatMode.ALL
+        applyRepeatMode()
+
+        exoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 _isPlaying.value = playing
             }
 
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) {
-                    _duration.value = player.duration.coerceAtLeast(0)
+                    _duration.value = exoPlayer.duration.coerceAtLeast(0)
                 }
             }
 
@@ -108,6 +181,7 @@ class PlayerManager @Inject constructor(
                         _queue.value.getOrNull(fallbackIdx)?.let { addToHistory(it) }
                     }
                 }
+                _currentLyricsLine.value = ""
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -148,6 +222,30 @@ class PlayerManager @Inject constructor(
                 _playHistory.value = songs
             }
         }
+
+        startLyricsUpdate()
+    }
+
+    // ---------- 歌词更新协程 ----------
+    private fun startLyricsUpdate() {
+        lyricsUpdateJob?.cancel()
+        lyricsUpdateJob = scope.launch {
+            while (true) {
+                delay(200)
+                updateProgress()
+                val pos = (progress.value * duration.value).toLong()
+                val song = currentSong.value
+                val line = if (song != null) {
+                    val lines = parseLyrics(song.lrc)
+                    val idx = lines.indexOfLast { it.timestampMs <= pos }
+                    if (idx >= 0 && idx < lines.size) lines[idx].text else ""
+                } else ""
+                if (line != _currentLyricsLine.value) {
+                    _currentLyricsLine.value = line
+                    desktopLyricsManager.updateLyrics(line)
+                }
+            }
+        }
     }
 
     // ---------- 核心播放入口 ----------
@@ -157,18 +255,20 @@ class PlayerManager @Inject constructor(
             // 1. 优先检查本地缓存/下载
             val local = withContext(Dispatchers.IO) { getLocalSong(song.id) }
             if (local != null) {
-                _queue.value = listOf(local)
+                val finalSong = ensureLocalLyrics(local)
+                _queue.value = listOf(finalSong)
                 _currentIndex.value = 0
-                playInternalDirect(local)
+                playInternalDirect(finalSong)
                 return@launch
             }
 
-            // 2. 检查是否为本地文件路径（包括 content://）
+            // 2. 检查是否为本地文件路径
             val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://") || song.mp3Url.startsWith("content://")
             if (isLocal) {
-                _queue.value = listOf(song)
+                val finalSong = ensureLocalLyrics(song)
+                _queue.value = listOf(finalSong)
                 _currentIndex.value = 0
-                playInternalDirect(song)
+                playInternalDirect(finalSong)
                 return@launch
             }
 
@@ -195,49 +295,20 @@ class PlayerManager @Inject constructor(
         }
     }
 
+    /**
+     * 播放整个队列（将整个 _queue 同步到播放器）
+     */
     fun playQueue(songs: List<Song>, startIndex: Int = 0) {
         if (songs.isEmpty()) return
         scope.launch {
-            _queue.value = songs
-            val target = songs.getOrNull(startIndex) ?: return@launch
-
-            val local = withContext(Dispatchers.IO) { getLocalSong(target.id) }
-            if (local != null) {
-                val newQueue = _queue.value.toMutableList()
-                newQueue[startIndex] = local
-                _queue.value = newQueue
-                _currentIndex.value = startIndex
-                playInternalDirect(local)
-                return@launch
-            }
-
-            val isLocal = target.mp3Url.startsWith("/") || target.mp3Url.startsWith("file://") || target.mp3Url.startsWith("content://")
-            if (isLocal) {
-                _currentIndex.value = startIndex
-                playInternalDirect(target)
-                return@launch
-            }
-
-            if (networkPreferenceManager.isNetworkBlocked()) {
-                _errorMessage.value = "网络已禁用，无法播放在线歌曲"
-                return@launch
-            }
-
-            val fullSong = withContext(Dispatchers.IO) { fetchSongDetailForce(target) }
-            if (fullSong == null) {
-                _errorMessage.value = "获取歌曲信息失败"
-                return@launch
-            }
-
-            withContext(Dispatchers.IO) {
-                cacheSongForOffline(fullSong)
-            }
-
-            val newQueue = _queue.value.toMutableList()
-            newQueue[startIndex] = fullSong
-            _queue.value = newQueue
+            // 确保所有歌曲都加载歌词
+            val ensuredSongs = songs.map { ensureLocalLyrics(it) }
+            _queue.value = ensuredSongs
             _currentIndex.value = startIndex
-            playInternal(fullSong)
+            _currentSong.value = ensuredSongs.getOrNull(startIndex)
+
+            // 将整个队列同步到播放器
+            syncQueueToPlayer(startIndex)
         }
     }
 
@@ -245,13 +316,15 @@ class PlayerManager @Inject constructor(
         scope.launch {
             val local = withContext(Dispatchers.IO) { getLocalSong(song.id) }
             if (local != null) {
-                addToQueueInternal(local, afterCurrent = true)
+                val finalSong = ensureLocalLyrics(local)
+                addToQueueInternal(finalSong, afterCurrent = true)
                 return@launch
             }
 
             val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://") || song.mp3Url.startsWith("content://")
             if (isLocal) {
-                addToQueueInternal(song, afterCurrent = true)
+                val finalSong = ensureLocalLyrics(song)
+                addToQueueInternal(finalSong, afterCurrent = true)
                 return@launch
             }
 
@@ -277,13 +350,15 @@ class PlayerManager @Inject constructor(
         scope.launch {
             val local = withContext(Dispatchers.IO) { getLocalSong(song.id) }
             if (local != null) {
-                addToQueueInternal(local, afterCurrent = false)
+                val finalSong = ensureLocalLyrics(local)
+                addToQueueInternal(finalSong, afterCurrent = false)
                 return@launch
             }
 
             val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://") || song.mp3Url.startsWith("content://")
             if (isLocal) {
-                addToQueueInternal(song, afterCurrent = false)
+                val finalSong = ensureLocalLyrics(song)
+                addToQueueInternal(finalSong, afterCurrent = false)
                 return@launch
             }
 
@@ -323,13 +398,9 @@ class PlayerManager @Inject constructor(
         if (_currentIndex.value >= insertIdx) {
             _currentIndex.value = _currentIndex.value + 1
         }
-        player.addMediaItem(
-            insertIdx,
-            MediaItem.Builder()
-                .setUri(song.mp3Url)
-                .setMediaId(song.id)
-                .build()
-        )
+        // 增量添加，不打断播放
+        exoPlayer.addMediaItem(insertIdx, buildMediaItem(song))
+        applyRepeatMode()
     }
 
     fun removeFromQueue(index: Int) {
@@ -342,7 +413,7 @@ class PlayerManager @Inject constructor(
 
         if (isCurrent) {
             if (q.isEmpty()) {
-                player.stop()
+                exoPlayer.stop()
                 _currentSong.value = null
                 _currentIndex.value = -1
             } else {
@@ -351,11 +422,12 @@ class PlayerManager @Inject constructor(
                     val nextSong = q[nextIdx]
                     val local = withContext(Dispatchers.IO) { getLocalSong(nextSong.id) }
                     if (local != null) {
+                        val finalLocal = ensureLocalLyrics(local)
                         val newQ = _queue.value.toMutableList()
-                        newQ[nextIdx] = local
+                        newQ[nextIdx] = finalLocal
                         _queue.value = newQ
                         _currentIndex.value = nextIdx
-                        playInternalDirect(local)
+                        playInternalDirect(finalLocal)
                     } else {
                         val fullSong = withContext(Dispatchers.IO) { fetchSongDetailForce(nextSong) }
                         if (fullSong == null) {
@@ -377,50 +449,54 @@ class PlayerManager @Inject constructor(
             if (index < _currentIndex.value) {
                 _currentIndex.value = _currentIndex.value - 1
             }
-            if (index < player.mediaItemCount) {
-                player.removeMediaItem(index)
+            if (index < exoPlayer.mediaItemCount) {
+                exoPlayer.removeMediaItem(index)
             }
+            applyRepeatMode()
         }
     }
 
     // ---------- 播放控制 ----------
 
     fun togglePlay() {
-        if (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING) {
-            if (player.isPlaying) player.pause() else player.play()
+        if (exoPlayer.playbackState == Player.STATE_READY || exoPlayer.playbackState == Player.STATE_BUFFERING) {
+            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
         }
     }
 
     fun seekTo(fraction: Float) {
         val pos = (fraction * _duration.value).toLong()
-        player.seekTo(pos)
+        exoPlayer.seekTo(pos)
         _progress.value = fraction
     }
 
     fun skipNext() {
         if (_queue.value.isEmpty()) return
         val nextIdx = (_currentIndex.value + 1) % _queue.value.size
-        playSongAtIndex(nextIdx)
+        // 直接使用 exoPlayer 的 seekTo 切换，同时更新状态
+        exoPlayer.seekTo(nextIdx, 0)
+        _currentIndex.value = nextIdx
+        _currentSong.value = _queue.value[nextIdx]
     }
 
     fun skipPrevious() {
         if (_queue.value.isEmpty()) return
         val prevIdx = if (_currentIndex.value <= 0) _queue.value.size - 1 else _currentIndex.value - 1
-        playSongAtIndex(prevIdx)
+        exoPlayer.seekTo(prevIdx, 0)
+        _currentIndex.value = prevIdx
+        _currentSong.value = _queue.value[prevIdx]
     }
 
     fun skipToIndex(index: Int) {
         if (index < 0 || index >= _queue.value.size) return
-        playSongAtIndex(index)
+        exoPlayer.seekTo(index, 0)
+        _currentIndex.value = index
+        _currentSong.value = _queue.value[index]
     }
 
     fun setRepeatMode(mode: RepeatMode) {
         _repeatMode.value = mode
-        player.repeatMode = when (mode) {
-            RepeatMode.NONE -> Player.REPEAT_MODE_OFF
-            RepeatMode.ONE -> Player.REPEAT_MODE_ONE
-            RepeatMode.ALL -> Player.REPEAT_MODE_ALL
-        }
+        applyRepeatMode()
     }
 
     fun toggleFavorite(song: Song) {
@@ -446,63 +522,23 @@ class PlayerManager @Inject constructor(
     fun isFavorite(songId: String): Boolean = songId in _favoriteIds.value
 
     fun updateProgress() {
-        val dur = player.duration.coerceAtLeast(0)
+        val dur = exoPlayer.duration.coerceAtLeast(0)
         if (dur > 0) {
             _duration.value = dur
-            _progress.value = (player.currentPosition.toFloat() / dur).coerceIn(0f, 1f)
+            _progress.value = (exoPlayer.currentPosition.toFloat() / dur).coerceIn(0f, 1f)
         }
     }
 
     fun release() {
-        player.release()
+        lyricsUpdateJob?.cancel()
+        exoPlayer.release()
     }
 
     // ---------- 核心内部方法 ----------
 
-    private fun playSongAtIndex(index: Int) {
-        if (index < 0 || index >= _queue.value.size) return
-        val song = _queue.value[index]
-        scope.launch {
-            val local = withContext(Dispatchers.IO) { getLocalSong(song.id) }
-            if (local != null) {
-                val newQueue = _queue.value.toMutableList()
-                newQueue[index] = local
-                _queue.value = newQueue
-                _currentIndex.value = index
-                playInternalDirect(local)
-                return@launch
-            }
-
-            val isLocal = song.mp3Url.startsWith("/") || song.mp3Url.startsWith("file://") || song.mp3Url.startsWith("content://")
-            if (isLocal) {
-                _currentIndex.value = index
-                playInternalDirect(song)
-                return@launch
-            }
-
-            if (networkPreferenceManager.isNetworkBlocked()) {
-                _errorMessage.value = "网络已禁用，无法播放在线歌曲"
-                return@launch
-            }
-
-            val fullSong = withContext(Dispatchers.IO) { fetchSongDetailForce(song) }
-            if (fullSong == null) {
-                _errorMessage.value = "获取歌曲信息失败"
-                return@launch
-            }
-
-            withContext(Dispatchers.IO) {
-                cacheSongForOffline(fullSong)
-            }
-
-            val newQueue = _queue.value.toMutableList()
-            newQueue[index] = fullSong
-            _queue.value = newQueue
-            _currentIndex.value = index
-            playInternal(fullSong)
-        }
-    }
-
+    /**
+     * 单曲播放（用于 play 方法，不涉及队列同步）
+     */
     private fun playInternal(song: Song) {
         if (song.mp3Url.isEmpty()) {
             _errorMessage.value = "歌曲播放链接无效，请尝试其他源"
@@ -510,19 +546,18 @@ class PlayerManager @Inject constructor(
         }
         _currentSong.value = song
         addToHistory(song)
-        player.stop()
-        player.clearMediaItems()
-        player.setMediaItem(
-            MediaItem.Builder()
-                .setUri(song.mp3Url)
-                .setMediaId(song.id)
-                .build()
-        )
-        player.prepare()
-        player.playWhenReady = true
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        exoPlayer.setMediaItem(buildMediaItem(song))
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = true
         _errorMessage.value = null
+        applyRepeatMode()
     }
 
+    /**
+     * 单曲播放（直接播放，不进行网络检查，用于本地文件或缓存）
+     */
     private fun playInternalDirect(song: Song) {
         if (song.mp3Url.isEmpty()) {
             _errorMessage.value = "歌曲文件无效"
@@ -530,17 +565,13 @@ class PlayerManager @Inject constructor(
         }
         _currentSong.value = song
         addToHistory(song)
-        player.stop()
-        player.clearMediaItems()
-        player.setMediaItem(
-            MediaItem.Builder()
-                .setUri(song.mp3Url)
-                .setMediaId(song.id)
-                .build()
-        )
-        player.prepare()
-        player.playWhenReady = true
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        exoPlayer.setMediaItem(buildMediaItem(song))
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = true
         _errorMessage.value = null
+        applyRepeatMode()
     }
 
     private suspend fun getLocalSong(songId: String): Song? {
@@ -608,28 +639,15 @@ class PlayerManager @Inject constructor(
         }
     }
 
-    /**
-     * 缓存歌曲到本地（使用已有的 fullSong，不再调用 API）
-     */
     private suspend fun cacheSongForOffline(fullSong: Song) {
         try {
-            // 检查是否已缓存
             val cached = cacheRepository.getCachedSong(fullSong.id)
             if (cached != null) {
                 val file = File(cached.mp3Url)
-                if (file.exists()) {
-                    return
-                }
+                if (file.exists()) return
             }
-
-            // 检查是否已下载（用户下载管理）
             val download = downloadRepository.getDownload(fullSong.id)
-            if (download != null) {
-                // 如果有记录，可能是 Uri 或路径，我们信任它存在
-                return
-            }
-
-            // 使用已有完整信息缓存（不再调用 API）
+            if (download != null) return
             downloadManager.cacheSongWithFullInfo(fullSong) { result ->
                 if (result.isSuccess) {
                     val file = result.getOrNull()
@@ -641,7 +659,6 @@ class PlayerManager @Inject constructor(
                         }
                     }
                 }
-                // 缓存失败静默处理
             }
         } catch (e: Exception) {
             e.printStackTrace()

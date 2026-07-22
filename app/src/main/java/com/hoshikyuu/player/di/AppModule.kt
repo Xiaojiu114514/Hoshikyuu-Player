@@ -7,6 +7,7 @@ import com.hoshikyuu.player.data.local.dao.*
 import com.hoshikyuu.player.data.remote.MusicApi
 import com.hoshikyuu.player.data.remote.NetworkClient
 import com.hoshikyuu.player.data.repository.*
+import com.hoshikyuu.player.player.DesktopLyricsManager
 import com.hoshikyuu.player.player.DownloadManager
 import com.hoshikyuu.player.utils.NetworkPreferenceManager
 import com.hoshikyuu.player.utils.NetworkUtils
@@ -125,4 +126,9 @@ object AppModule {
     @Singleton
     fun provideNetworkPreferenceManager(@ApplicationContext context: Context): NetworkPreferenceManager =
         NetworkPreferenceManager(context)
+
+    @Provides
+    @Singleton
+    fun provideDesktopLyricsManager(@ApplicationContext context: Context): DesktopLyricsManager =
+        DesktopLyricsManager(context)
 }

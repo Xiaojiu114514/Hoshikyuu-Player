@@ -30,6 +30,8 @@ fun DownloadManagementScreen(
     val downloadedSongs by viewModel.downloadedSongs.collectAsState()
     val favoriteIds by playerManager.favoriteIds.collectAsState()
 
+    var showClearDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -41,20 +43,51 @@ fun DownloadManagementScreen(
                 },
                 actions = {
                     if (downloadedSongs.isNotEmpty()) {
-                        IconButton(onClick = {
-                            viewModel.clearAllDownloads { success ->
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(if (success) "已清除所有下载" else "清除失败")
-                                }
-                            }
-                        }) {
+                        IconButton(
+                            onClick = { showClearDialog = true }
+                        ) {
                             Icon(Icons.Default.Delete, "全部删除")
                         }
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
+        if (showClearDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearDialog = false },
+                title = { Text("确认清空") },
+                text = {
+                    Text("此操作将删除所有已下载的歌曲文件及数据库记录，确定继续吗？")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showClearDialog = false
+                            viewModel.clearAllDownloads { success ->
+                                scope.launch {
+                                    if (success) {
+                                        snackbarHostState.showSnackbar("已清除所有下载")
+                                    } else {
+                                        snackbarHostState.showSnackbar("清除失败")
+                                    }
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("确定")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
+
         if (downloadedSongs.isEmpty()) {
             Box(
                 Modifier
@@ -176,10 +209,5 @@ fun DownloadManagementScreen(
                 item { Spacer(Modifier.height(80.dp)) }
             }
         }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.padding(16.dp)
-        )
     }
 }

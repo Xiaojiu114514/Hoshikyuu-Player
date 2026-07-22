@@ -11,7 +11,7 @@ data class DownloadEntity(
     val album: String = "",
     val coverUrl: String = "",
     val localFilePath: String,
-    val lrc: String = "",               // 新增歌词字段
+    val lrc: String = "",
     val downloadTime: Long = System.currentTimeMillis(),
     val source: String = "wy"
 )

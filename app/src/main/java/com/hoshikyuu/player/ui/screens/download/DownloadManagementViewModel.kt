@@ -1,4 +1,3 @@
-// file: ui/screens/download/DownloadManagementViewModel.kt
 package com.hoshikyuu.player.ui.screens.download
 
 import androidx.lifecycle.ViewModel
